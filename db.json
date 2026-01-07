@@ -1,0 +1,108 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "role": "owner",
+      "fullName": "Μαρία Παπαδοπούλου",
+      "email": "maria@demo.gr",
+      "password": "1234",
+      "phone": "6900000000"
+    },
+    {
+      "id": 2,
+      "role": "vet",
+      "fullName": "Γιώργος Γεωργίου",
+      "email": "vet@demo.gr",
+      "password": "1234",
+      "afm": "123456789",
+      "clinicName": "Vet Clinic Athens",
+      "clinicAddress": "Αθήνα",
+      "experienceYears": 8,
+      "educationLevel": "Πτυχίο"
+    },
+    {
+      "id": 3,
+      "role": "citizen",
+      "fullName": "Απλός Χρήστης",
+      "email": "user@demo.gr",
+      "password": "1234"
+    }
+  ],
+  "pets": [
+    {
+      "id": 1,
+      "ownerId": 1,
+      "microchip": "1234567",
+      "name": "Ρεξ",
+      "species": "Σκύλος",
+      "sex": "Αρσενικό",
+      "color": "Χρυσαφί",
+      "birthDate": "2022-10-20"
+    }
+  ],
+  "medicalActs": [
+    {
+      "id": 1,
+      "petId": 1,
+      "vetId": 2,
+      "date": "2023-10-08",
+      "type": "Στείρωση",
+      "notes": ""
+    }
+  ],
+  "lostPets": [
+    {
+      "id": 1,
+      "petId": 1,
+      "ownerId": 1,
+      "status": "submitted",
+      "area": "Κολωνάκι, Αθήνα",
+      "lostDate": "2025-11-18",
+      "details": "Κόκκινο λουρί",
+      "photos": []
+    }
+  ],
+  "foundReports": [
+    {
+      "id": 1,
+      "lostPetId": 1,
+      "reporterName": "Πολίτης",
+      "reporterPhone": "69XXXXXXXX",
+      "location": "Κοντά στην πλατεία",
+      "date": "2025-11-19",
+      "details": "Τον είδα στο πάρκο",
+      "photos": []
+    }
+  ],
+  "vetAvailability": [
+    {
+      "id": 1,
+      "vetId": 2,
+      "dayOfWeek": "Δευτέρα",
+      "startTime": "10:00",
+      "endTime": "14:00",
+      "actTypes": ["Καταγραφή", "Εμβόλιο", "Εξέταση"]
+    }
+  ],
+  "appointments": [
+    {
+      "id": 1,
+      "ownerId": 1,
+      "vetId": 2,
+      "petId": 1,
+      "date": "2026-01-10",
+      "time": "11:00",
+      "actType": "Εξέταση",
+      "status": "pending"
+    }
+  ],
+  "reviews": [
+    {
+      "id": 1,
+      "ownerId": 1,
+      "vetId": 2,
+      "rating": 5,
+      "comment": "Εξαιρετικός!"
+    }
+  ]
+}
