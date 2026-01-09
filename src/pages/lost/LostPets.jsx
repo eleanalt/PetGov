@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
+import LostBreadcrumbs from "../../components/LostBreadcrumbs";
+
 import {
   Box,
   Card,
@@ -15,16 +17,17 @@ import {
   TextField,
   Typography,
   Button,
-  Paper,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import PlaceOutlinedIcon from "@mui/icons-material/PlaceOutlined";
 import CalendarMonthOutlinedIcon from "@mui/icons-material/CalendarMonthOutlined";
-import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
 import { useNavigate } from "react-router-dom";
 import { api } from "../../api/client";
 
-/** Photo */
+/**
+ * Βάλε την εικόνα που θες στο: /public/dog.jpg
+ * (Vite: ό,τι είναι στο public σερβίρεται από "/")
+ */
 function PetPhoto({ src, alt }) {
   return (
     <Box
@@ -32,14 +35,14 @@ function PetPhoto({ src, alt }) {
       src={src || "/dog.jpg"}
       alt={alt || "pet"}
       sx={{
-        height: 190,
+        height: 170,
         width: "100%",
         objectFit: "cover",
         borderRadius: 2,
+        border: "1px solid",
+        borderColor: "divider",
         display: "block",
         bgcolor: "grey.200",
-        border: "1px solid",
-        borderColor: "grey.400",
       }}
       onError={(e) => {
         e.currentTarget.src = "/dog.jpg";
@@ -56,84 +59,55 @@ function LostPetCard({ lost, pet, onOpen }) {
     <Card
       variant="outlined"
       sx={{
-        borderRadius: 3,
+        borderRadius: 2,
         height: "100%",
-        borderColor: "grey.700",
-        boxShadow: "none",
       }}
     >
-      <CardContent
-        sx={{
-          p: 2,
-          display: "flex",
-          flexDirection: "column",
-          height: "100%",
-        }}
-      >
+      <CardContent>
         <PetPhoto src={imgSrc} alt={pet?.name} />
 
         <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mt: 2 }}>
-          <Typography variant="h6" sx={{ fontWeight: 900, lineHeight: 1.1 }}>
+          <Typography variant="h6" fontWeight={900}>
             {pet?.name ?? "—"}
           </Typography>
-
-          <Chip
-            size="small"
-            label={pet?.species ?? "—"}
-            sx={{
-              bgcolor: "grey.200",
-              border: "1px solid",
-              borderColor: "grey.400",
-              fontWeight: 600,
-            }}
-          />
+          <Chip size="small" label={pet?.species ?? "—"} />
         </Stack>
 
-        <Typography variant="body2" sx={{ mt: 0.5, color: "text.secondary" }}>
-          {pet?.breed ? `${pet.breed} • ` : ""}
-          {pet?.color ?? "—"}
-          {pet?.age ? ` • ${pet.age}` : ""}
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+          {pet?.color ?? "—"} • {pet?.sex ?? "—"}
         </Typography>
 
         <Stack spacing={1} sx={{ mt: 2 }}>
           <Stack direction="row" spacing={1} alignItems="center">
-            <PlaceOutlinedIcon fontSize="small" sx={{ color: "text.secondary" }} />
-            <Typography variant="body2">{lost?.area ?? "—"}</Typography>
+            <PlaceOutlinedIcon fontSize="small" />
+            <Typography variant="body2">{lost.area}</Typography>
           </Stack>
 
           <Stack direction="row" spacing={1} alignItems="center">
-            <CalendarMonthOutlinedIcon fontSize="small" sx={{ color: "text.secondary" }} />
-            <Typography variant="body2">
-              Ημερομηνία απώλειας: {lost?.lostDate ?? "—"}
-            </Typography>
+            <CalendarMonthOutlinedIcon fontSize="small" />
+            <Typography variant="body2">Ημερομηνία απώλειας: {lost.lostDate}</Typography>
           </Stack>
 
-          <Typography variant="body2" sx={{ color: "text.secondary" }}>
-            {lost?.details || "—"}
+          <Divider />
+
+          <Typography variant="body2" color="text.secondary">
+            {lost.details || "—"}
           </Typography>
 
-          <Divider sx={{ my: 0.5, borderColor: "grey.400" }} />
-
-          <Typography variant="caption" sx={{ color: "text.secondary" }}>
+          <Typography variant="caption" color="text.secondary">
             Microchip: {pet?.microchip ?? "—"}
           </Typography>
         </Stack>
 
         <Button
-          onClick={onOpen}
+          fullWidth
           variant="contained"
+          onClick={onOpen}
           sx={{
-            mt: "auto",
-            alignSelf: "center",
-            px: 3,
-            py: 0.8,
+            mt: 2,
             textTransform: "none",
-            borderRadius: 2.5,
-            fontWeight: 700,
-            bgcolor: "grey.500",
-            color: "common.white",
-            boxShadow: "none",
-            "&:hover": { bgcolor: "grey.600", boxShadow: "none" },
+            fontWeight: 800,
+            borderRadius: 2,
           }}
         >
           Προβολή λεπτομερειών
@@ -155,7 +129,7 @@ export default function LostPets() {
   const [area, setArea] = useState("all");
 
   // pagination
-  const pageSize = 6;
+  const pageSize = 6; // ✅ 6 ανά σελίδα
   const [page, setPage] = useState(1);
 
   useEffect(() => {
@@ -197,7 +171,7 @@ export default function LostPets() {
 
       if (!query) return true;
 
-      const hay = [pet.name, pet.microchip, pet.color, pet.breed, pet.species, l.area, l.details]
+      const hay = [pet.name, pet.microchip, pet.color, pet.species, l.area, l.details]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
@@ -208,160 +182,122 @@ export default function LostPets() {
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
 
-  useEffect(() => setPage(1), [q, species, area]);
+  // αν αλλάξουν φίλτρα → πήγαινε στην 1η σελίδα
+  useEffect(() => {
+    setPage(1);
+  }, [q, species, area]);
+
+  // clamp page αν μειωθούν results
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
 
   const pageItems = filtered.slice((page - 1) * pageSize, page * pageSize);
 
-  // ίδιο πλάτος για filters + grid (όπως στο mid-fi)
-  const contentMaxWidth = 980;
-
   return (
-    <Box sx={{ bgcolor: "grey.200", minHeight: "calc(100vh - 76px)", pb: 6 }}>
-      <Container maxWidth="lg" sx={{ pt: 2 }}>
-        {/* Breadcrumb + back */}
-        <Box sx={{ maxWidth: contentMaxWidth, mx: "auto" }}>
-          <Typography variant="caption" sx={{ color: "text.secondary" }}>
-            Αρχική→Απολεσθέντα ζώα
+    <Box sx={{ bgcolor: "grey.100", minHeight: "calc(100vh - 76px)", py: 4 }}>
+      <Container maxWidth="lg">
+        <LostBreadcrumbs />
+        {/* Header */}
+        <Stack spacing={1} sx={{ textAlign: "center", mb: 3 }}>
+          <Typography variant="h4" fontWeight={900}>
+            Απολεσθέντα Κατοικίδια
           </Typography>
-
-          <Button
-            onClick={() => navigate("/")}
-            startIcon={<ArrowBackIosNewIcon fontSize="small" />}
-            sx={{
-              mt: 0.5,
-              mb: 1,
-              px: 0,
-              textTransform: "none",
-              color: "text.primary",
-              fontWeight: 600,
-              "&:hover": { bgcolor: "transparent" },
-            }}
-          >
-            Επιστροφή στην αρχική σελίδα
-          </Button>
-        </Box>
-
-        {/* Hero (γκρι περιοχή με τίτλο) */}
-        <Box
-          sx={{
-            bgcolor: "grey.300",
-            border: "1px solid",
-            borderColor: "grey.400",
-            py: 4,
-            mb: 2,
-          }}
-        >
-          <Stack spacing={1} sx={{ textAlign: "center" }}>
-            <Typography variant="h3" sx={{ fontWeight: 900, letterSpacing: -0.5 }}>
-              Απολεσθέντα Κατοικίδια
-            </Typography>
-            <Typography variant="body2" sx={{ color: "text.secondary" }}>
-              Αναζητήστε και βοηθήστε στην επιστροφή των απολεσθέντων
-              <br />
-              κατοικιδίων στις οικογένειές τους
-            </Typography>
-          </Stack>
-        </Box>
-
-        {/* Main content aligned */}
-        <Box sx={{ maxWidth: contentMaxWidth, mx: "auto" }}>
-          {/* Filters bar */}
-          <Paper
-            variant="outlined"
-            sx={{
-              p: 1,
-              borderRadius: 2,
-              borderColor: "grey.400",
-              bgcolor: "common.white",
-            }}
-          >
-            <Grid container spacing={1} alignItems="center">
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  placeholder="Αναζήτηση (Όνομα, Microchip, Ράτσα)"
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <SearchIcon fontSize="small" />
-                      </InputAdornment>
-                    ),
-                  }}
-                  sx={{
-                    "& .MuiOutlinedInput-root": { borderRadius: 999 },
-                  }}
-                />
-              </Grid>
-
-              <Grid item xs={12} md={3}>
-                <Select
-                  fullWidth
-                  size="small"
-                  value={species}
-                  onChange={(e) => setSpecies(e.target.value)}
-                  sx={{ borderRadius: 999 }}
-                >
-                  {allSpecies.map((s) => (
-                    <MenuItem key={s} value={s}>
-                      {s === "all" ? "Όλα τα είδη" : s}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </Grid>
-
-              <Grid item xs={12} md={3}>
-                <Select
-                  fullWidth
-                  size="small"
-                  value={area}
-                  onChange={(e) => setArea(e.target.value)}
-                  sx={{ borderRadius: 999 }}
-                >
-                  {allAreas.map((a) => (
-                    <MenuItem key={a} value={a}>
-                      {a === "all" ? "Όλες οι περιοχές" : a}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </Grid>
-            </Grid>
-          </Paper>
-
-          {/* Count line */}
-          <Typography variant="body2" sx={{ mt: 1, mb: 2, color: "text.secondary" }}>
-            Βρέφεκαν {filtered.length} απολεσθέντα κατοικίδια
+          <Typography variant="body2" color="text.secondary">
+            Αναζητήστε και βοηθήστε στην επιστροφή των απολεσθέντων κατοικιδίων στις οικογένειές τους
           </Typography>
+        </Stack>
 
-          {/* Cards grid (2 columns like mid-fi) */}
-          <Grid container spacing={2} justifyContent="flex-start" alignItems="stretch">
-            {pageItems.map((l) => (
-              <Grid key={l.id} item xs={12} md={6} sx={{ display: "flex" }}>
-                <LostPetCard
-                  lost={l}
-                  pet={petsById[l.petId]}
-                  onOpen={() => navigate(`/lost/${l.id}`)}
-                />
+        {/* ✅ Κοινό πλάτος (ίδιο) για Filters + Cards ώστε να είναι τέλεια ευθυγραμμισμένα */}
+        <Box sx={{ maxWidth: 1100, mx: "auto" }}>
+          {/* Filters */}
+          <Card variant="outlined" sx={{ borderRadius: 2 }}>
+            <CardContent>
+              <Grid container spacing={2} alignItems="center">
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    placeholder="Αναζήτηση (Όνομα, Microchip, Ράτσα)"
+                    value={q}
+                    onChange={(e) => setQ(e.target.value)}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <SearchIcon />
+                        </InputAdornment>
+                      ),
+                    }}
+                  />
+                </Grid>
+
+                <Grid item xs={12} md={3}>
+                  <Select fullWidth value={species} onChange={(e) => setSpecies(e.target.value)}>
+                    {allSpecies.map((s) => (
+                      <MenuItem key={s} value={s}>
+                        {s === "all" ? "Όλα τα είδη" : s}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </Grid>
+
+                <Grid item xs={12} md={3}>
+                  <Select fullWidth value={area} onChange={(e) => setArea(e.target.value)}>
+                    {allAreas.map((a) => (
+                      <MenuItem key={a} value={a}>
+                        {a === "all" ? "Όλες οι περιοχές" : a}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </Grid>
               </Grid>
-            ))}
-          </Grid>
+
+              <Divider sx={{ my: 2 }} />
+
+              <Typography variant="body2" color="text.secondary">
+                Βρέθηκαν {filtered.length} απολεσθέντα κατοικίδια
+              </Typography>
+            </CardContent>
+          </Card>
+
+        {/* Cards */}
+<Box sx={{ mt: 1, px: 1 /* +8px για να ακυρώσει το -8px του Grid spacing */ }}>
+  <Grid container spacing={2} justifyContent="center">
+    {pageItems.map((l) => (
+      <Grid
+        key={l.id}
+        item
+        xs={12}
+        sm={6}
+        md={4} // 3 ανά σειρά σε desktop
+        sx={{ display: "flex" }}
+      >
+        <Box sx={{ width: "100%" }}>
+          <LostPetCard
+            lost={l}
+            pet={petsById[l.petId]}
+           onOpen={() =>
+  navigate(`/lost/${l.id}`, {
+    state: { petName: petsById[l.petId]?.name },
+  })
+}
+
+          />
+        </Box>
+      </Grid>
+    ))}
+  </Grid>
+</Box>
+
 
           {/* Pagination */}
-          {totalPages > 1 && (
-            <Stack alignItems="center" sx={{ mt: 3 }}>
-              <Pagination
-                count={totalPages}
-                page={page}
-                onChange={(_e, p) => setPage(p)}
-                shape="rounded"
-              />
-            </Stack>
-          )}
+          <Stack alignItems="center" sx={{ mt: 3 }}>
+            <Pagination
+              count={totalPages}
+              page={page}
+              onChange={(_e, p) => setPage(p)}
+              shape="rounded"
+            />
+          </Stack>
         </Box>
       </Container>
     </Box>

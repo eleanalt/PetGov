@@ -11,12 +11,12 @@ export const USER_MENU = {
     { label: "Δηλώσεις απώλειας", to: "/owner/lost" }
   ],
   vet: [
-    { label: "Dashboard", to: "/vet" },
-    { label: "Διαθεσιμότητα", to: "/vet/availability" },
+    { label: "Οδηγός", to: "/vet" },
+    { label: "Προφίλ", to: "/vet/profile" },
+    { label: "Καταγραφές", to: "/vet/registrations" },
+    { label: "Ιατρικές Πράξεις", to: "/vet/acts" },
     { label: "Ραντεβού", to: "/vet/appointments" },
-    { label: "Ιατρικές πράξεις", to: "/vet/acts" }
   ],
-  citizen: [{ label: "Οι αναφορές μου", to: "/citizen/reports" }]
 };
 
 export const ROLE_LABELS = {

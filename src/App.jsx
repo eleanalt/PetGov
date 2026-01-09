@@ -16,10 +16,13 @@ import OwnerPets from "./pages/owner/OwnerPets";
 import OwnerAppointments from "./pages/owner/OwnerAppointments";
 import OwnerLost from "./pages/owner/OwnerLost";
 
-import VetDashboard from "./pages/vet/VetDashboard";
 import VetAvailability from "./pages/vet/VetAvailability";
 import VetAppointments from "./pages/vet/VetAppointments";
 import VetActs from "./pages/vet/VetActs";
+import VetGuide from "./pages/vet/VetGuide";
+import VetProfile from "./pages/vet/VetProfile";
+import VetRegistrations from "./pages/vet/VetRegistrations";
+import VetRegistrationWizard from "./pages/vet/VetRegistrationWizard";
 
 import OwnersFaq from "./pages/info/OwnersFaq";
 import VetsFaq from "./pages/info/VetsFaq";
@@ -51,7 +54,13 @@ export default function App() {
 
           {/* Vet protected */}
           <Route element={<RequireAuth allowedRoles={["vet"]} />}>
-            <Route path="/vet" element={<VetDashboard />} />
+          <Route path="/vet" element={<VetGuide />} />
+          <Route path="/vet/profile" element={<VetProfile />} />
+
+          <Route path="/vet/registrations" element={<VetRegistrations />} />
+          <Route path="/vet/registrations/new" element={<VetRegistrationWizard />} />
+          <Route path="/vet/registrations/:regId" element={<VetRegistrationWizard />} />
+
             <Route path="/vet/availability" element={<VetAvailability />} />
             <Route path="/vet/appointments" element={<VetAppointments />} />
             <Route path="/vet/acts" element={<VetActs />} />
