@@ -1,7 +1,7 @@
 {
   "users": [
     {
-      "id": 1,
+      "id": "1",
       "role": "owner",
       "fullName": "Μαρία Παπαδοπούλου",
       "email": "maria@demo.gr",
@@ -9,7 +9,7 @@
       "phone": "6900000000"
     },
     {
-      "id": 2,
+      "id": "2",
       "role": "vet",
       "fullName": "Γιώργος Γεωργίου",
       "email": "vet@demo.gr",
@@ -21,19 +21,63 @@
       "educationLevel": "Πτυχίο"
     },
     {
-      "id": 3,
+      "id": "3",
       "role": "citizen",
       "fullName": "Απλός Χρήστης",
       "email": "user@demo.gr",
       "password": "1234"
+    },
+    {
+      "id": "76e3",
+      "role": "owner",
+      "fullName": "Eleana",
+      "email": "eleanaliti@gmail.com",
+      "phone": "6940700455",
+      "password": "nanatita"
     }
   ],
   "pets": [
     {
-      "id": 1,
+      "id": "1",
       "ownerId": 1,
       "microchip": "1234567",
       "name": "Ρεξ",
+      "species": "Σκύλος",
+      "sex": "Αρσενικό",
+      "color": "Χρυσαφί",
+      "birthDate": "2022-10-20"
+    },{
+      "id": "2",
+      "ownerId": 2,
+      "microchip": "1234567",
+      "name": "Μαξ",
+      "species": "Σκύλος",
+      "sex": "Αρσενικό",
+      "color": "Χρυσαφί",
+      "birthDate": "2022-10-20"
+    },{
+      "id": "3",
+      "ownerId": 3,
+      "microchip": "1234567",
+      "name": "Μαξ",
+      "species": "Σκύλος",
+      "sex": "Αρσενικό",
+      "color": "Χρυσαφί",
+      "birthDate": "2022-10-20"
+    },{
+      "id": "4",
+      "ownerId": 4,
+      "microchip": "1234567",
+      "name": "Μαξ",
+      "species": "Σκύλος",
+      "sex": "Αρσενικό",
+      "color": "Χρυσαφί",
+      "birthDate": "2022-10-20"
+    },{
+      "id": "5",
+      "ownerId": 5,
+      "microchip": "1234567",
+      "name": "Μαξ",
       "species": "Σκύλος",
       "sex": "Αρσενικό",
       "color": "Χρυσαφί",
@@ -42,7 +86,7 @@
   ],
   "medicalActs": [
     {
-      "id": 1,
+      "id": "1",
       "petId": 1,
       "vetId": 2,
       "date": "2023-10-08",
@@ -52,19 +96,59 @@
   ],
   "lostPets": [
     {
-      "id": 1,
+      "id": "1",
       "petId": 1,
       "ownerId": 1,
       "status": "submitted",
       "area": "Κολωνάκι, Αθήνα",
       "lostDate": "2025-11-18",
       "details": "Κόκκινο λουρί",
-      "photos": []
+      "photos": ["/dog.jpg"]
+    },
+    {
+      "id": "2",
+      "petId": 2,
+      "ownerId": 2,
+      "status": "submitted",
+      "area": "Κολωνάκι, Αθήνα",
+      "lostDate": "2025-11-18",
+      "details": "mple λουρί",
+      "photos": ["/dog.jpg"]
+    },
+    {
+      "id": "3",
+      "petId": 3,
+      "ownerId": 3,
+      "status": "submitted",
+      "area": "Κολωνάκι, Αθήνα",
+      "lostDate": "2025-11-18",
+      "details": "mple λουρί",
+      "photos": ["/dog.jpg"]
+    },
+    {
+      "id": "4",
+      "petId": 4,
+      "ownerId": 4,
+      "status": "submitted",
+      "area": "Κολωνάκι, Αθήνα",
+      "lostDate": "2025-11-18",
+      "details": "mple λουρί",
+      "photos": ["/dog.jpg"]
+    },
+    {
+      "id": "5",
+      "petId": 5,
+      "ownerId": 5,
+      "status": "submitted",
+      "area": "Κολωνάκι, Αθήνα",
+      "lostDate": "2025-11-18",
+      "details": "mple λουρί",
+      "photos": ["/dog.jpg"]
     }
   ],
   "foundReports": [
     {
-      "id": 1,
+      "id": "1",
       "lostPetId": 1,
       "reporterName": "Πολίτης",
       "reporterPhone": "69XXXXXXXX",
@@ -72,21 +156,37 @@
       "date": "2025-11-19",
       "details": "Τον είδα στο πάρκο",
       "photos": []
+    },
+    {
+      "id": "a4d2",
+      "lostPetId": 1,
+      "reporterName": "τεστ",
+      "reporterPhone": "6940700455",
+      "reporterEmail": "eleanaliti@gmail.com",
+      "location": "φφφφφφ, φφφφ, 49100",
+      "date": "2026-01-05",
+      "details": "",
+      "photos": [],
+      "microchip": "15854485445"
     }
   ],
   "vetAvailability": [
     {
-      "id": 1,
+      "id": "1",
       "vetId": 2,
       "dayOfWeek": "Δευτέρα",
       "startTime": "10:00",
       "endTime": "14:00",
-      "actTypes": ["Καταγραφή", "Εμβόλιο", "Εξέταση"]
+      "actTypes": [
+        "Καταγραφή",
+        "Εμβόλιο",
+        "Εξέταση"
+      ]
     }
   ],
   "appointments": [
     {
-      "id": 1,
+      "id": "1",
       "ownerId": 1,
       "vetId": 2,
       "petId": 1,
@@ -98,7 +198,7 @@
   ],
   "reviews": [
     {
-      "id": 1,
+      "id": "1",
       "ownerId": 1,
       "vetId": 2,
       "rating": 5,

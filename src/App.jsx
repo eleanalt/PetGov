@@ -7,7 +7,9 @@ import Register from "./pages/Register";
 import NotFound from "./pages/NotFound";
 import RequireAuth from "./auth/RequireAuth";
 
-import LostPets from "./pages/LostPets";
+import LostPets from "./pages/lost/LostPets";
+import LostPetDetails from "./pages/lost/LostPetDetails";
+import FoundReportWizard from "./pages/lost/FoundReportWizard";
 
 import OwnerDashboard from "./pages/owner/OwnerDashboard";
 import OwnerPets from "./pages/owner/OwnerPets";
@@ -33,6 +35,8 @@ export default function App() {
           <Route path="/register" element={<Register />} /> 
           {/* Public */}
           <Route path="/lost" element={<LostPets />} />
+          <Route path="/lost/:id" element={<LostPetDetails />} />
+          <Route path="/lost/:id/found" element={<FoundReportWizard />} />
           <Route path="/info/owners" element={<OwnersFaq />} />
           <Route path="/info/vets" element={<VetsFaq />} />
           <Route path="/info/citizens" element={<CitizensFaq />} />
