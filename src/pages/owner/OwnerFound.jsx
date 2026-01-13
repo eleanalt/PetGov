@@ -11,14 +11,14 @@ import {
   Box,
 } from "@mui/material";
 
-export default function OwnerLost() {
-  const [status, setStatus] = useState("draft"); // draft | submitted
+export default function OwnerFound() {
+  const [status, setStatus] = useState("draft");
 
   const [formData, setFormData] = useState({
-    petName: "",
     description: "",
-    lastLocation: "",
-    dateLost: "",
+    location: "",
+    dateFound: "",
+    notes: "",
   });
 
   const isReadOnly = status === "submitted";
@@ -32,10 +32,9 @@ export default function OwnerLost() {
       <Card>
         <CardContent>
           <Typography variant="h5" gutterBottom>
-            Δήλωση Απώλειας Κατοικιδίου
+            Δήλωση Εύρεσης Κατοικιδίου
           </Typography>
 
-          {/* Κατάσταση Δήλωσης */}
           <Box sx={{ mb: 2 }}>
             <Chip
               label={
@@ -50,18 +49,7 @@ export default function OwnerLost() {
           <Grid container spacing={2}>
             <Grid item xs={12}>
               <TextField
-                label="Όνομα Κατοικιδίου"
-                name="petName"
-                fullWidth
-                value={formData.petName}
-                onChange={handleChange}
-                disabled={isReadOnly}
-              />
-            </Grid>
-
-            <Grid item xs={12}>
-              <TextField
-                label="Περιγραφή"
+                label="Περιγραφή Κατοικιδίου"
                 name="description"
                 multiline
                 rows={3}
@@ -74,10 +62,10 @@ export default function OwnerLost() {
 
             <Grid item xs={12}>
               <TextField
-                label="Τελευταία Τοποθεσία"
-                name="lastLocation"
+                label="Τοποθεσία Εύρεσης"
+                name="location"
                 fullWidth
-                value={formData.lastLocation}
+                value={formData.location}
                 onChange={handleChange}
                 disabled={isReadOnly}
               />
@@ -85,19 +73,31 @@ export default function OwnerLost() {
 
             <Grid item xs={12}>
               <TextField
-                label="Ημερομηνία Απώλειας"
-                name="dateLost"
+                label="Ημερομηνία Εύρεσης"
+                name="dateFound"
                 type="date"
                 fullWidth
                 InputLabelProps={{ shrink: true }}
-                value={formData.dateLost}
+                value={formData.dateFound}
+                onChange={handleChange}
+                disabled={isReadOnly}
+              />
+            </Grid>
+
+            <Grid item xs={12}>
+              <TextField
+                label="Σημειώσεις"
+                name="notes"
+                multiline
+                rows={2}
+                fullWidth
+                value={formData.notes}
                 onChange={handleChange}
                 disabled={isReadOnly}
               />
             </Grid>
           </Grid>
 
-          {/* Κουμπιά */}
           <Box sx={{ mt: 4, display: "flex", gap: 2 }}>
             {status === "draft" && (
               <>
@@ -106,7 +106,6 @@ export default function OwnerLost() {
                 </Button>
                 <Button
                   variant="contained"
-                  color="primary"
                   onClick={() => setStatus("submitted")}
                 >
                   Οριστική Υποβολή
@@ -125,4 +124,3 @@ export default function OwnerLost() {
     </Container>
   );
 }
-
