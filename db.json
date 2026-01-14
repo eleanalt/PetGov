@@ -1,7 +1,7 @@
 {
   "users": [
     {
-      "id": 1,
+      "id": "1",
       "role": "owner",
       "fullName": "Μαρία Παπαδοπούλου",
       "email": "maria@demo.gr",
@@ -9,7 +9,7 @@
       "phone": "6900000000"
     },
     {
-      "id": 2,
+      "id": "2",
       "role": "vet",
       "fullName": "Γιώργος Γεωργίου",
       "email": "vet@demo.gr",
@@ -21,16 +21,24 @@
       "educationLevel": "Πτυχίο"
     },
     {
-      "id": 3,
+      "id": "3",
       "role": "citizen",
       "fullName": "Απλός Χρήστης",
       "email": "user@demo.gr",
       "password": "1234"
+    },
+    {
+      "id": "7db2",
+      "role": "owner",
+      "fullName": "Σοφία Αθανασοπούλου",
+      "email": "SophieSofaki29@gmail.com",
+      "phone": "6970828068",
+      "password": "ψκλδωκδμωκσ"
     }
   ],
   "pets": [
     {
-      "id": 1,
+      "id": "1",
       "ownerId": 1,
       "microchip": "1234567",
       "name": "Ρεξ",
@@ -42,7 +50,7 @@
   ],
   "medicalActs": [
     {
-      "id": 1,
+      "id": "1",
       "petId": 1,
       "vetId": 2,
       "date": "2023-10-08",
@@ -52,7 +60,7 @@
   ],
   "lostPets": [
     {
-      "id": 1,
+      "id": "1",
       "petId": 1,
       "ownerId": 1,
       "status": "submitted",
@@ -64,7 +72,7 @@
   ],
   "foundReports": [
     {
-      "id": 1,
+      "id": "1",
       "lostPetId": 1,
       "reporterName": "Πολίτης",
       "reporterPhone": "69XXXXXXXX",
@@ -76,17 +84,21 @@
   ],
   "vetAvailability": [
     {
-      "id": 1,
+      "id": "1",
       "vetId": 2,
       "dayOfWeek": "Δευτέρα",
       "startTime": "10:00",
       "endTime": "14:00",
-      "actTypes": ["Καταγραφή", "Εμβόλιο", "Εξέταση"]
+      "actTypes": [
+        "Καταγραφή",
+        "Εμβόλιο",
+        "Εξέταση"
+      ]
     }
   ],
   "appointments": [
     {
-      "id": 1,
+      "id": "1",
       "ownerId": 1,
       "vetId": 2,
       "petId": 1,
@@ -98,7 +110,7 @@
   ],
   "reviews": [
     {
-      "id": 1,
+      "id": "1",
       "ownerId": 1,
       "vetId": 2,
       "rating": 5,
