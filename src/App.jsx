@@ -15,6 +15,11 @@ import OwnerDashboard from "./pages/owner/OwnerDashboard";
 import OwnerPets from "./pages/owner/OwnerPets";
 import OwnerAppointments from "./pages/owner/OwnerAppointments";
 import OwnerLost from "./pages/owner/OwnerLost";
+import OwnerPetHealth from "./pages/owner/OwnerPetHealth";
+import OwnerFound from "./pages/owner/OwnerFound";
+import OwnerDeclarationsHistory from "./pages/owner/OwnerDeclarationsHistory";
+import OwnerVetSearch from "./pages/owner/OwnerVetSearch";
+
 
 import VetAvailability from "./pages/vet/VetAvailability";
 import VetAppointments from "./pages/vet/VetAppointments";
@@ -27,6 +32,8 @@ import VetRegistrationWizard from "./pages/vet/VetRegistrationWizard";
 import OwnersFaq from "./pages/info/OwnersFaq";
 import VetsFaq from "./pages/info/VetsFaq";
 import CitizensFaq from "./pages/info/CitizensFaq";
+import OwnerGuide from "./pages/info/OwnerGuide";
+
 
 export default function App() {
   return (
@@ -43,6 +50,7 @@ export default function App() {
         <Route path="/info/owners" element={<OwnersFaq />} />
         <Route path="/info/vets" element={<VetsFaq />} />
         <Route path="/info/citizens" element={<CitizensFaq />} />
+        <Route path="/info/owner-guide" element={<OwnerGuide />} />
 
         {/* Owner protected */}
         <Route element={<RequireAuth allowedRoles={["owner"]} />}>
@@ -50,6 +58,9 @@ export default function App() {
           <Route path="/owner/pets" element={<OwnerPets />} />
           <Route path="/owner/appointments" element={<OwnerAppointments />} />
           <Route path="/owner/lost" element={<OwnerLost />} />
+          <Route path="/owner/found" element={<OwnerFound />} />
+          <Route path="/owner/history" element={<OwnerDeclarationsHistory />} />
+          <Route path="/owner/vets/search" element={<OwnerVetSearch />} />
         </Route>
 
         {/* Vet protected */}
