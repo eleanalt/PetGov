@@ -22,13 +22,24 @@ a:hover {
   color: #535bf2;
 }
 
-body {
+html, body, #root {
+  height: 100%;
   margin: 0;
-  display: flex;
-  place-items: center;
+  padding: 0;
+}
+
+body {
   min-width: 320px;
   min-height: 100vh;
+  display: block; /* ✅ όχι flex */
+  background: #f3f4f6; /* προαιρετικό, ταιριάζει με grey.100 */
 }
+
+#root {
+  width: 100%;
+}
+
+
 
 h1 {
   font-size: 3.2em;

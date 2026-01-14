@@ -5,25 +5,87 @@ import {
   Card,
   CardContent,
   Container,
-  Grid,
+  Divider,
+  IconButton,
   Stack,
   TextField,
-  Typography
+  Typography,
 } from "@mui/material";
-import { api } from "../../api/client";
-import { useAuth } from "../../auth/AuthContext";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import EditIcon from "@mui/icons-material/Edit";
+import CheckIcon from "@mui/icons-material/Check";
+import CloseIcon from "@mui/icons-material/Close";
+import PhotoCameraOutlinedIcon from "@mui/icons-material/PhotoCameraOutlined";
 import { useNavigate } from "react-router-dom";
+import { api } from "../../api/client";
+
+/** -------------------------------------------------------
+ *  ✅ Fix: βρίσκουμε logged user από ΟΠΟΙΟ key + local/session
+ *  (ώστε να μην ξαναβγαίνει "Δεν βρέθηκε συνδεδεμένος χρήστης")
+ *  ------------------------------------------------------ */
+function normalizeUser(obj) {
+  if (!obj) return null;
+  if (obj.user?.id) return obj.user;
+  if (obj.auth?.user?.id) return obj.auth.user;
+  if (obj.id) return obj;
+  return null;
+}
+
+function tryParse(raw) {
+  if (!raw) return null;
+  // αν έχει αποθηκευτεί σκέτο id σαν string "2"
+  if (/^\d+$/.test(raw)) return { id: raw };
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function getStoredUser() {
+  const storages = [localStorage, sessionStorage];
+  const preferredKeys = [
+    "user",
+    "authUser",
+    "currentUser",
+    "loggedUser",
+    "auth",
+    "session",
+    "petgovUser",
+  ];
+
+  // 1) preferred keys
+  for (const storage of storages) {
+    for (const k of preferredKeys) {
+      const parsed = tryParse(storage.getItem(k));
+      const u = normalizeUser(parsed);
+      if (u?.id) return u;
+    }
+  }
+
+  // 2) brute-force όλα τα keys (για να πιάσει το δικό σου login όπως κι αν το έγραψες)
+  for (const storage of storages) {
+    for (let i = 0; i < storage.length; i++) {
+      const key = storage.key(i);
+      const parsed = tryParse(storage.getItem(key));
+      const u = normalizeUser(parsed);
+      if (u?.id) return u;
+    }
+  }
+
+  return null;
+}
 
 function PhotoPlaceholder() {
   return (
     <Box
       sx={{
-        width: 220,
-        height: 140,
+        width: "100%",
+        height: 220,
+        borderRadius: 6,
         bgcolor: "grey.300",
-        borderRadius: 2,
         position: "relative",
-        overflow: "hidden"
+        overflow: "hidden",
       }}
     >
       <Box
@@ -31,176 +93,294 @@ function PhotoPlaceholder() {
           position: "absolute",
           inset: 0,
           background:
-            "linear-gradient(135deg, transparent 48%, rgba(0,0,0,0.25) 49%, rgba(0,0,0,0.25) 51%, transparent 52%), linear-gradient(45deg, transparent 48%, rgba(0,0,0,0.25) 49%, rgba(0,0,0,0.25) 51%, transparent 52%)"
+            "linear-gradient(135deg, transparent 48%, rgba(0,0,0,0.15) 49%, rgba(0,0,0,0.15) 51%, transparent 52%), linear-gradient(45deg, transparent 48%, rgba(0,0,0,0.15) 49%, rgba(0,0,0,0.15) 51%, transparent 52%)",
         }}
       />
     </Box>
   );
 }
 
+function Row({
+  label,
+  value,
+  isEditing,
+  isActive,
+  onStartEdit,
+  onCancel,
+  onSave,
+  inputValue,
+  setInputValue,
+  type = "text",
+}) {
+  return (
+    <Box sx={{ py: 1.4 }}>
+      <Stack direction="row" alignItems="center" spacing={2}>
+        <Typography sx={{ minWidth: 150, fontWeight: 800 }}>{label}</Typography>
+
+        {!isEditing ? (
+          <Typography sx={{ color: value ? "text.primary" : "text.secondary" }}>
+            {value || "—"}
+          </Typography>
+        ) : (
+          <Box sx={{ flex: 1 }}>
+            {isActive ? (
+              <Stack direction="row" alignItems="center" spacing={1}>
+                <TextField
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  size="small"
+                  fullWidth
+                  type={type}
+                  placeholder="—"
+                />
+                <IconButton onClick={onSave} aria-label="save">
+                  <CheckIcon />
+                </IconButton>
+                <IconButton onClick={onCancel} aria-label="cancel">
+                  <CloseIcon />
+                </IconButton>
+              </Stack>
+            ) : (
+              <Stack direction="row" alignItems="center" spacing={1}>
+                <Typography
+                  sx={{ color: value ? "text.primary" : "text.secondary", flex: 1 }}
+                >
+                  {value || "—"}
+                </Typography>
+                <IconButton onClick={onStartEdit} aria-label="edit">
+                  <EditIcon />
+                </IconButton>
+              </Stack>
+            )}
+          </Box>
+        )}
+      </Stack>
+
+      <Divider sx={{ mt: 1.4 }} />
+    </Box>
+  );
+}
+
 export default function VetProfile() {
-  const { user } = useAuth();
   const navigate = useNavigate();
 
-  const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState({
-    fullName: "",
-    email: "",
-    afm: "",
-    phone: "",
-    gender: "",
-    education: "",
-    experienceYears: "",
-    clinicName: "",
-    clinicAddress: ""
-  });
+  // ✅ ΜΗΝ το κάνεις useMemo, γιατί αν κάνεις login χωρίς refresh δεν θα το δει.
+  const [userId, setUserId] = useState(() => getStoredUser()?.id ?? null);
+
+  // ξαναδιάβασε user όταν γυρνάς στο tab ή αλλάζει storage (π.χ. login)
+  useEffect(() => {
+    const read = () => setUserId(getStoredUser()?.id ?? null);
+    read();
+    window.addEventListener("focus", read);
+    window.addEventListener("storage", read);
+    return () => {
+      window.removeEventListener("focus", read);
+      window.removeEventListener("storage", read);
+    };
+  }, []);
+
+  const [profile, setProfile] = useState(null); // “αποθηκευμένο”
+  const [draft, setDraft] = useState(null); // “προς αλλαγή”
+  const [editMode, setEditMode] = useState(false);
+
+  // inline editing (ένα πεδίο κάθε φορά)
+  const [activeField, setActiveField] = useState(null);
+  const [activeValue, setActiveValue] = useState("");
 
   useEffect(() => {
     (async () => {
-      try {
-        // preferred: /vetProfiles/me
-        const me = await api.get("/vetProfiles/me");
-        setForm((prev) => ({ ...prev, ...(me.data ?? {}) }));
-      } catch {
-        // fallback: /vetProfiles?userId=
-        try {
-          const res = await api.get(`/vetProfiles?userId=${user?.id}`);
-          const existing = Array.isArray(res.data) ? res.data[0] : null;
-          if (existing) setForm((prev) => ({ ...prev, ...existing }));
-        } catch {
-          // ignore (θα μείνει άδειο)
-        }
-      } finally {
-        setLoading(false);
-      }
+      if (!userId) return;
+      const res = await api.get(`/users/${userId}`);
+      setProfile(res.data);
+      setDraft(res.data);
     })();
-  }, [user?.id]);
+  }, [userId]);
 
-  const set = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value }));
+  if (!userId) {
+    return (
+      <Box sx={{ bgcolor: "grey.100", minHeight: "calc(100vh - 76px)", py: 4 }}>
+        <Container maxWidth="lg">
+          <Typography fontWeight={900} variant="h5">
+            Δεν βρέθηκε συνδεδεμένος χρήστης
+          </Typography>
+          <Typography color="text.secondary" sx={{ mt: 1 }}>
+            Κάνε login και βεβαιώσου ότι αποθηκεύεις τον χρήστη στο localStorage ή
+            sessionStorage.
+          </Typography>
+          <Button sx={{ mt: 2 }} variant="contained" onClick={() => navigate("/login")}>
+            Σύνδεση
+          </Button>
+        </Container>
+      </Box>
+    );
+  }
 
-  const onSave = async () => {
-    // minimal save strategy: upsert by userId
-    const payload = { ...form, userId: user?.id };
+  if (!profile || !draft) return null;
 
-    try {
-      // try me endpoint
-      await api.put("/vetProfiles/me", payload);
-      navigate("/vet");
-      return;
-    } catch {
-      // fallback: find then patch/post
-    }
+  const fields = [
+    { key: "fullName", label: "Ονοματεπώνυμο" },
+    { key: "email", label: "Email" },
+    { key: "afm", label: "ΑΦΜ" },
+    { key: "phone", label: "Τηλέφωνο" },
+    { key: "gender", label: "Φύλο" },
+    { key: "educationLevel", label: "Επίπεδο σπουδών" },
+    { key: "experienceYears", label: "Εμπειρία (έτη)", type: "number" },
+    { key: "clinicName", label: "Επωνυμία" },
+    { key: "clinicAddress", label: "Διεύθυνση" },
+  ];
 
-    try {
-      const res = await api.get(`/vetProfiles?userId=${user?.id}`);
-      const existing = Array.isArray(res.data) ? res.data[0] : null;
-
-      if (existing?.id) {
-        await api.patch(`/vetProfiles/${existing.id}`, payload);
-      } else {
-        await api.post("/vetProfiles", payload);
-      }
-      navigate("/vet");
-    } catch (e) {
-      console.error(e);
-      alert("Αποτυχία αποθήκευσης προφίλ.");
-    }
+  const startEditField = (key) => {
+    setActiveField(key);
+    setActiveValue(draft?.[key] ?? "");
   };
 
-  if (loading) return null;
+  const cancelEditField = () => {
+    setActiveField(null);
+    setActiveValue("");
+  };
+
+  const saveEditFieldToDraft = () => {
+    if (!activeField) return;
+    setDraft((d) => ({ ...d, [activeField]: activeValue }));
+    setActiveField(null);
+    setActiveValue("");
+  };
+
+  const cancelWholeEdit = () => {
+    setDraft(profile); // επαναφορά
+    setEditMode(false);
+    cancelEditField();
+  };
+
+  const finishEdit = async () => {
+    const payload = {
+      ...draft,
+      role: profile.role || "vet",
+    };
+
+    const res = await api.patch(`/users/${userId}`, payload);
+    setProfile(res.data);
+    setDraft(res.data);
+
+    setEditMode(false);
+    cancelEditField();
+  };
 
   return (
     <Box sx={{ bgcolor: "grey.100", minHeight: "calc(100vh - 76px)", py: 4 }}>
       <Container maxWidth="lg">
-        <Typography variant="h4" fontWeight={900} sx={{ mb: 2 }}>
-          Επεξεργασία Προφίλ
-        </Typography>
+        <Button
+          startIcon={<ArrowBackIcon />}
+          onClick={() => navigate("/")}
+          sx={{ textTransform: "none", mb: 2 }}
+        >
+          Επιστροφή στην αρχική σελίδα
+        </Button>
 
-        <Card variant="outlined" sx={{ borderRadius: 2 }}>
-          <CardContent sx={{ p: { xs: 2.5, md: 4 } }}>
-            <Grid container spacing={3}>
-              <Grid item xs={12} md={4}>
-                <Stack spacing={1.5} alignItems="flex-start">
-                  <PhotoPlaceholder />
-                  <Button variant="outlined" sx={{ textTransform: "none", borderRadius: 2 }}>
-                    Αλλαγή εικόνας
-                  </Button>
-                </Stack>
-              </Grid>
+        {/* Title + right button */}
+        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
+          <Typography variant="h3" fontWeight={900}>
+            Επαγγελματικό Προφίλ
+          </Typography>
 
-              <Grid item xs={12} md={8}>
-                <Grid container spacing={2}>
-                  <Grid item xs={12} md={6}>
-                    <TextField fullWidth label="Ονοματεπώνυμο" value={form.fullName} onChange={set("fullName")} />
-                  </Grid>
-                  <Grid item xs={12} md={6}>
-                    <TextField fullWidth label="Email" value={form.email} onChange={set("email")} />
-                  </Grid>
+          {!editMode ? (
+            <Button
+              variant="outlined"
+              startIcon={<EditIcon />}
+              onClick={() => setEditMode(true)}
+              sx={{ textTransform: "none", borderRadius: 999 }}
+            >
+              Επεξεργασία
+            </Button>
+          ) : (
+            <Button
+              variant="contained"
+              startIcon={<EditIcon />}
+              onClick={finishEdit}
+              sx={{ textTransform: "none", borderRadius: 999, fontWeight: 900 }}
+              disabled={!!activeField}
+            >
+              Τέλος επεξεργασίας
+            </Button>
+          )}
+        </Stack>
 
-                  <Grid item xs={12} md={6}>
-                    <TextField fullWidth label="ΑΦΜ" value={form.afm} onChange={set("afm")} />
-                  </Grid>
-                  <Grid item xs={12} md={6}>
-                    <TextField fullWidth label="Τηλέφωνο" value={form.phone} onChange={set("phone")} />
-                  </Grid>
+        <Card variant="outlined" sx={{ borderRadius: 6 }}>
+          <CardContent sx={{ p: { xs: 2, md: 3 } }}>
+            <Box
+              sx={{
+                display: { xs: "block", md: "flex" },
+                gap: 3,
+                alignItems: "flex-start",
+              }}
+            >
+              {/* Left photo */}
+              <Box sx={{ width: { xs: "100%", md: 360 } }}>
+                <PhotoPlaceholder />
+                <Button
+                  variant="outlined"
+                  startIcon={<PhotoCameraOutlinedIcon />}
+                  sx={{
+                    mt: 2,
+                    textTransform: "none",
+                    borderRadius: 999,
+                    width: "fit-content",
+                  }}
+                  onClick={() => alert("Upload εικόνας (TODO)")}
+                  disabled={!editMode}
+                >
+                  Αλλαγή εικόνας
+                </Button>
+              </Box>
 
-                  <Grid item xs={12} md={6}>
-                    <TextField fullWidth label="Φύλο" value={form.gender} onChange={set("gender")} />
-                  </Grid>
-                  <Grid item xs={12} md={6}>
-                    <TextField
-                      fullWidth
-                      label="Επίπεδο σπουδών"
-                      value={form.education}
-                      onChange={set("education")}
-                    />
-                  </Grid>
+              {/* Right info rows */}
+              <Box sx={{ flex: 1 }}>
+                {fields.map((f) => (
+                  <Row
+                    key={f.key}
+                    label={f.label}
+                    value={
+                      f.key === "experienceYears" && (draft?.[f.key] ?? "") !== ""
+                        ? String(draft?.[f.key])
+                        : draft?.[f.key]
+                    }
+                    isEditing={editMode}
+                    isActive={activeField === f.key}
+                    onStartEdit={() => startEditField(f.key)}
+                    onCancel={cancelEditField}
+                    onSave={saveEditFieldToDraft}
+                    inputValue={activeValue}
+                    setInputValue={setActiveValue}
+                    type={f.type || "text"}
+                  />
+                ))}
 
-                  <Grid item xs={12} md={6}>
-                    <TextField
-                      fullWidth
-                      label="Εμπειρία (έτη)"
-                      value={form.experienceYears}
-                      onChange={set("experienceYears")}
-                    />
-                  </Grid>
-                  <Grid item xs={12} md={6}>
-                    <TextField
-                      fullWidth
-                      label="Επωνυμία Ιατρείου"
-                      value={form.clinicName}
-                      onChange={set("clinicName")}
-                    />
-                  </Grid>
+                {/* ✅ Κουμπιά κάτω από τις πληροφορίες */}
+                {editMode && (
+                  <Box sx={{ pt: 2 }}>
+                    <Stack direction="row" justifyContent="center" spacing={2}>
+                      <Button
+                        variant="outlined"
+                        onClick={cancelWholeEdit}
+                        sx={{ textTransform: "none", borderRadius: 999, px: 4 }}
+                        disabled={!!activeField}
+                      >
+                        Ακύρωση
+                      </Button>
 
-                  <Grid item xs={12}>
-                    <TextField
-                      fullWidth
-                      label="Διεύθυνση Ιατρείου"
-                      value={form.clinicAddress}
-                      onChange={set("clinicAddress")}
-                    />
-                  </Grid>
-                </Grid>
-
-                <Stack direction="row" spacing={2} sx={{ mt: 3 }}>
-                  <Button
-                    variant="outlined"
-                    onClick={() => navigate("/vet")}
-                    sx={{ textTransform: "none", borderRadius: 2 }}
-                  >
-                    Ακύρωση
-                  </Button>
-                  <Button
-                    variant="contained"
-                    onClick={onSave}
-                    sx={{ textTransform: "none", borderRadius: 2, fontWeight: 900 }}
-                  >
-                    Ολοκλήρωση επεξεργασίας
-                  </Button>
-                </Stack>
-              </Grid>
-            </Grid>
+                      <Button
+                        variant="contained"
+                        onClick={finishEdit}
+                        sx={{ textTransform: "none", borderRadius: 999, px: 4, fontWeight: 900 }}
+                        disabled={!!activeField}
+                      >
+                        Ολοκλήρωση επεξεργασίας
+                      </Button>
+                    </Stack>
+                  </Box>
+                )}
+              </Box>
+            </Box>
           </CardContent>
         </Card>
       </Container>

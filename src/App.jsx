@@ -1,5 +1,5 @@
 import React from "react";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { Route, Routes } from "react-router-dom";
 import AppLayout from "./layouts/AppLayout";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
@@ -30,30 +30,30 @@ import CitizensFaq from "./pages/info/CitizensFaq";
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route element={<AppLayout />}>
-          <Route path="/" element={<Home />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} /> 
-          {/* Public */}
-          <Route path="/lost" element={<LostPets />} />
-          <Route path="/lost/:id" element={<LostPetDetails />} />
-          <Route path="/lost/:id/found" element={<FoundReportWizard />} />
-          <Route path="/info/owners" element={<OwnersFaq />} />
-          <Route path="/info/vets" element={<VetsFaq />} />
-          <Route path="/info/citizens" element={<CitizensFaq />} />
+    <Routes>
+      <Route element={<AppLayout />}>
+        <Route path="/" element={<Home />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
 
-          {/* Owner protected */}
-          <Route element={<RequireAuth allowedRoles={["owner"]} />}>
-            <Route path="/owner" element={<OwnerDashboard />} />
-            <Route path="/owner/pets" element={<OwnerPets />} />
-            <Route path="/owner/appointments" element={<OwnerAppointments />} />
-            <Route path="/owner/lost" element={<OwnerLost />} />
-          </Route>
+        {/* Public */}
+        <Route path="/lost" element={<LostPets />} />
+        <Route path="/lost/:id" element={<LostPetDetails />} />
+        <Route path="/lost/:id/found" element={<FoundReportWizard />} />
+        <Route path="/info/owners" element={<OwnersFaq />} />
+        <Route path="/info/vets" element={<VetsFaq />} />
+        <Route path="/info/citizens" element={<CitizensFaq />} />
 
-          {/* Vet protected */}
-          <Route element={<RequireAuth allowedRoles={["vet"]} />}>
+        {/* Owner protected */}
+        <Route element={<RequireAuth allowedRoles={["owner"]} />}>
+          <Route path="/owner" element={<OwnerDashboard />} />
+          <Route path="/owner/pets" element={<OwnerPets />} />
+          <Route path="/owner/appointments" element={<OwnerAppointments />} />
+          <Route path="/owner/lost" element={<OwnerLost />} />
+        </Route>
+
+        {/* Vet protected */}
+        <Route element={<RequireAuth allowedRoles={["vet"]} />}>
           <Route path="/vet" element={<VetGuide />} />
           <Route path="/vet/profile" element={<VetProfile />} />
 
@@ -61,14 +61,13 @@ export default function App() {
           <Route path="/vet/registrations/new" element={<VetRegistrationWizard />} />
           <Route path="/vet/registrations/:regId" element={<VetRegistrationWizard />} />
 
-            <Route path="/vet/availability" element={<VetAvailability />} />
-            <Route path="/vet/appointments" element={<VetAppointments />} />
-            <Route path="/vet/acts" element={<VetActs />} />
-          </Route>
-
-          <Route path="*" element={<NotFound />} />
+          <Route path="/vet/availability" element={<VetAvailability />} />
+          <Route path="/vet/appointments" element={<VetAppointments />} />
+          <Route path="/vet/acts" element={<VetActs />} />
         </Route>
-      </Routes>
-    </BrowserRouter>
+
+        <Route path="*" element={<NotFound />} />
+      </Route>
+    </Routes>
   );
 }

@@ -11,7 +11,7 @@
     {
       "id": "2",
       "role": "vet",
-      "fullName": "Γιώργος Γεωργίου",
+      "fullName": "Μαριος Γεωργίου",
       "email": "vet@demo.gr",
       "password": "1234",
       "afm": "123456789",
@@ -34,6 +34,19 @@
       "email": "eleanaliti@gmail.com",
       "phone": "6940700455",
       "password": "nanatita"
+    },
+    {
+      "id": "e10a",
+      "role": "vet",
+      "fullName": "test test",
+      "email": "test@gmail.com",
+      "phone": "6940700456",
+      "password": "TEST",
+      "afm": "153544757",
+      "clinicName": "TEST TEST",
+      "clinicAddress": "TEST",
+      "educationLevel": "Πτυχίο",
+      "experienceYears": 2
     }
   ],
   "pets": [
@@ -46,7 +59,8 @@
       "sex": "Αρσενικό",
       "color": "Χρυσαφί",
       "birthDate": "2022-10-20"
-    },{
+    },
+    {
       "id": "2",
       "ownerId": 2,
       "microchip": "1234567",
@@ -55,7 +69,8 @@
       "sex": "Αρσενικό",
       "color": "Χρυσαφί",
       "birthDate": "2022-10-20"
-    },{
+    },
+    {
       "id": "3",
       "ownerId": 3,
       "microchip": "1234567",
@@ -64,7 +79,8 @@
       "sex": "Αρσενικό",
       "color": "Χρυσαφί",
       "birthDate": "2022-10-20"
-    },{
+    },
+    {
       "id": "4",
       "ownerId": 4,
       "microchip": "1234567",
@@ -73,7 +89,8 @@
       "sex": "Αρσενικό",
       "color": "Χρυσαφί",
       "birthDate": "2022-10-20"
-    },{
+    },
+    {
       "id": "5",
       "ownerId": 5,
       "microchip": "1234567",
@@ -103,7 +120,9 @@
       "area": "Κολωνάκι, Αθήνα",
       "lostDate": "2025-11-18",
       "details": "Κόκκινο λουρί",
-      "photos": ["/dog.jpg"]
+      "photos": [
+        "/dog.jpg"
+      ]
     },
     {
       "id": "2",
@@ -113,7 +132,9 @@
       "area": "Κολωνάκι, Αθήνα",
       "lostDate": "2025-11-18",
       "details": "mple λουρί",
-      "photos": ["/dog.jpg"]
+      "photos": [
+        "/dog.jpg"
+      ]
     },
     {
       "id": "3",
@@ -123,7 +144,9 @@
       "area": "Κολωνάκι, Αθήνα",
       "lostDate": "2025-11-18",
       "details": "mple λουρί",
-      "photos": ["/dog.jpg"]
+      "photos": [
+        "/dog.jpg"
+      ]
     },
     {
       "id": "4",
@@ -133,7 +156,9 @@
       "area": "Κολωνάκι, Αθήνα",
       "lostDate": "2025-11-18",
       "details": "mple λουρί",
-      "photos": ["/dog.jpg"]
+      "photos": [
+        "/dog.jpg"
+      ]
     },
     {
       "id": "5",
@@ -143,7 +168,9 @@
       "area": "Κολωνάκι, Αθήνα",
       "lostDate": "2025-11-18",
       "details": "mple λουρί",
-      "photos": ["/dog.jpg"]
+      "photos": [
+        "/dog.jpg"
+      ]
     }
   ],
   "foundReports": [

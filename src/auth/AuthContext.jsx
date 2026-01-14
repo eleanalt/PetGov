@@ -2,15 +2,29 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from "
 
 const AuthContext = createContext(null);
 
-const STORAGE_KEY = "petgov_current_user";
+// ✅ Διάλεξε ΕΝΑ key και κράτα το παντού ίδιο
+const STORAGE_KEY = "authUser";
+
+function safeParse(json) {
+  try {
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-
-  useEffect(() => {
+  // ✅ αρχικοποίηση από localStorage (ώστε να μην χάνεται στο refresh)
+  const [user, setUser] = useState(() => {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) setUser(JSON.parse(raw));
-  }, []);
+    return raw ? safeParse(raw) : null;
+  });
+
+  // ✅ ό,τι αλλάζει στο user, γράφεται στο localStorage
+  useEffect(() => {
+    if (user) localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+    else localStorage.removeItem(STORAGE_KEY);
+  }, [user]);
 
   const login = (u) => {
     setUser(u);
@@ -23,6 +37,7 @@ export function AuthProvider({ children }) {
   };
 
   const value = useMemo(() => ({ user, login, logout }), [user]);
+
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
