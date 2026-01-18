@@ -1,12 +1,13 @@
 export const MAIN_NAV = [
   { label: "Αρχική", to: "/", roles: ["public", "citizen", "owner", "vet"] },
-  { label: "Lost Pets", to: "/lost", roles: ["public", "citizen", "owner", "vet"] }
+  { label: "Απωλεσθέντα Ζώα", to: "/lost", roles: ["public", "citizen", "owner", "vet"] }
 ];
 
 // Dropdown menu ανά ρόλο (δεξιά πάνω)
 export const USER_MENU = {
   owner: [
     { label: "Dashboard", to: "/owner" },
+    { label: "Προφιλ", to: "/owner/profile" },
     { label: "Τα κατοικίδιά μου", to: "/owner/pets" },
     { label: "Τα ραντεβού μου", to: "/owner/appointments" },
     { label: "Δηλώσεις απώλειας", to: "/owner/lost" }

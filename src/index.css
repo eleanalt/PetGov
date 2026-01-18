@@ -1,4 +1,3 @@
-/* --- Global reset για full-width app --- */
 html, body, #root {
   height: 100%;
   width: 100%;
@@ -8,15 +7,13 @@ html, body, #root {
 
 * { box-sizing: border-box; }
 
-/* Βγάλε το Vite flex-centering + dark background */
 body {
-  display: block;              /* <- ΟΧΙ flex */
+  display: block;              
   min-height: 100vh;
-  background: #f5f6f8;         /* ή #fff αν θες */
-  color: #0f172a;              /* σκούρο κείμενο */
+  background: #f5f6f8;         
+  color: #0f172a;              
 }
 
-/* ΜΗΝ αφήσεις max-width / padding στο root */
 #root {
   max-width: none;
   padding: 0;

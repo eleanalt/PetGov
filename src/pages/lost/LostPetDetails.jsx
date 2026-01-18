@@ -23,7 +23,7 @@ function PhotoBox({ src, h = 220 }) {
         width: "100%",
         border: "1px solid",
         borderColor: "divider",
-        borderRadius: 0, // ⬅️ χωρίς στρογγυλές γωνίες
+        borderRadius: 0, 
         overflow: "hidden",
         bgcolor: "grey.300",
         position: "relative",
@@ -61,7 +61,7 @@ function PhotoBox({ src, h = 220 }) {
               )
             `,
             backgroundRepeat: "no-repeat",
-            backgroundSize: "100% 100%", // ⬅️ πιάνει όλη την επιφάνεια
+            backgroundSize: "100% 100%",
           }}
         />
       )}

@@ -9,7 +9,6 @@ export default function LostBreadcrumbs({ petName: petNameProp }) {
 
   const path = location.pathname;
 
-  // ✅ παίρνουμε όνομα από prop ή από navigate state
   const petNameFromState = location.state?.petName;
   const petName = petNameProp || petNameFromState;
 

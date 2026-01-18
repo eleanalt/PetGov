@@ -16,6 +16,7 @@ export const USER_MENU = {
     { label: "Καταγραφές", to: "/vet/registrations" },
     { label: "Ιατρικές Πράξεις", to: "/vet/acts" },
     { label: "Ραντεβού", to: "/vet/appointments" },
+    { label: "Αξιολογήσεις", to: "/vet/reviews" },
   ],
 };
 

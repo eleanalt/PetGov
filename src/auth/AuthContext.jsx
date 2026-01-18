@@ -2,7 +2,6 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from "
 
 const AuthContext = createContext(null);
 
-// ✅ Διάλεξε ΕΝΑ key και κράτα το παντού ίδιο
 const STORAGE_KEY = "authUser";
 
 function safeParse(json) {
@@ -14,13 +13,13 @@ function safeParse(json) {
 }
 
 export function AuthProvider({ children }) {
-  // ✅ αρχικοποίηση από localStorage (ώστε να μην χάνεται στο refresh)
+  //αρχικοποίηση από localStorage (ώστε να μην χάνεται στο refresh)
   const [user, setUser] = useState(() => {
     const raw = localStorage.getItem(STORAGE_KEY);
     return raw ? safeParse(raw) : null;
   });
 
-  // ✅ ό,τι αλλάζει στο user, γράφεται στο localStorage
+  //ό,τι αλλάζει στο user, γράφεται στο localStorage
   useEffect(() => {
     if (user) localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
     else localStorage.removeItem(STORAGE_KEY);

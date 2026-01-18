@@ -24,10 +24,6 @@ import CalendarMonthOutlinedIcon from "@mui/icons-material/CalendarMonthOutlined
 import { useNavigate } from "react-router-dom";
 import { api } from "../../api/client";
 
-/**
- * Βάλε την εικόνα που θες στο: /public/dog.jpg
- * (Vite: ό,τι είναι στο public σερβίρεται από "/")
- */
 function PetPhoto({ src, alt }) {
   return (
     <Box
@@ -56,13 +52,7 @@ function LostPetCard({ lost, pet, onOpen }) {
     Array.isArray(lost?.photos) && lost.photos.length > 0 ? lost.photos[0] : "/dog.jpg";
 
   return (
-    <Card
-      variant="outlined"
-      sx={{
-        borderRadius: 2,
-        height: "100%",
-      }}
-    >
+    <Card variant="outlined" sx={{ borderRadius: 2, height: "100%" }}>
       <CardContent>
         <PetPhoto src={imgSrc} alt={pet?.name} />
 
@@ -80,12 +70,14 @@ function LostPetCard({ lost, pet, onOpen }) {
         <Stack spacing={1} sx={{ mt: 2 }}>
           <Stack direction="row" spacing={1} alignItems="center">
             <PlaceOutlinedIcon fontSize="small" />
-            <Typography variant="body2">{lost.area}</Typography>
+            <Typography variant="body2">{lost.area || lost.lostArea || "—"}</Typography>
           </Stack>
 
           <Stack direction="row" spacing={1} alignItems="center">
             <CalendarMonthOutlinedIcon fontSize="small" />
-            <Typography variant="body2">Ημερομηνία απώλειας: {lost.lostDate}</Typography>
+            <Typography variant="body2">
+              Ημερομηνία απώλειας: {lost.lostDate || "—"}
+            </Typography>
           </Stack>
 
           <Divider />
@@ -129,18 +121,20 @@ export default function LostPets() {
   const [area, setArea] = useState("all");
 
   // pagination
-  const pageSize = 6; // ✅ 6 ανά σελίδα
+  const pageSize = 6;
   const [page, setPage] = useState(1);
 
   useEffect(() => {
     (async () => {
       const [lostRes, petsRes] = await Promise.all([api.get("/lostPets"), api.get("/pets")]);
 
-      const lost = lostRes.data ?? [];
-      const pets = petsRes.data ?? [];
+      const lostAll = Array.isArray(lostRes.data) ? lostRes.data : [];
+      const pets = Array.isArray(petsRes.data) ? petsRes.data : [];
       const map = Object.fromEntries(pets.map((p) => [p.id, p]));
 
-      setLostPets(lost);
+      const lostOpen = lostAll.filter((l) => (l.status || "submitted") === "submitted");
+
+      setLostPets(lostOpen);
       setPetsById(map);
     })();
   }, []);
@@ -155,7 +149,11 @@ export default function LostPets() {
   }, [petsById]);
 
   const allAreas = useMemo(() => {
-    const set = new Set(lostPets.map((l) => l.area).filter(Boolean));
+    const set = new Set(
+      lostPets
+        .map((l) => l.area || l.lostArea)
+        .filter(Boolean)
+    );
     return ["all", ...Array.from(set)];
   }, [lostPets]);
 
@@ -167,11 +165,12 @@ export default function LostPets() {
       if (!pet) return false;
 
       if (species !== "all" && pet.species !== species) return false;
-      if (area !== "all" && l.area !== area) return false;
+      const lArea = l.area || l.lostArea;
+      if (area !== "all" && lArea !== area) return false;
 
       if (!query) return true;
 
-      const hay = [pet.name, pet.microchip, pet.color, pet.species, l.area, l.details]
+      const hay = [pet.name, pet.microchip, pet.color, pet.species, lArea, l.details]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
@@ -182,12 +181,10 @@ export default function LostPets() {
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
 
-  // αν αλλάξουν φίλτρα → πήγαινε στην 1η σελίδα
   useEffect(() => {
     setPage(1);
   }, [q, species, area]);
 
-  // clamp page αν μειωθούν results
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
@@ -198,7 +195,7 @@ export default function LostPets() {
     <Box sx={{ bgcolor: "grey.100", minHeight: "calc(100vh - 76px)", py: 4 }}>
       <Container maxWidth="lg">
         <LostBreadcrumbs />
-        {/* Header */}
+
         <Stack spacing={1} sx={{ textAlign: "center", mb: 3 }}>
           <Typography variant="h4" fontWeight={900}>
             Απολεσθέντα Κατοικίδια
@@ -208,9 +205,7 @@ export default function LostPets() {
           </Typography>
         </Stack>
 
-        {/* ✅ Κοινό πλάτος (ίδιο) για Filters + Cards ώστε να είναι τέλεια ευθυγραμμισμένα */}
         <Box sx={{ maxWidth: 1100, mx: "auto" }}>
-          {/* Filters */}
           <Card variant="outlined" sx={{ borderRadius: 2 }}>
             <CardContent>
               <Grid container spacing={2} alignItems="center">
@@ -259,37 +254,26 @@ export default function LostPets() {
             </CardContent>
           </Card>
 
-        {/* Cards */}
-<Box sx={{ mt: 1, px: 1 /* +8px για να ακυρώσει το -8px του Grid spacing */ }}>
-  <Grid container spacing={2} justifyContent="center">
-    {pageItems.map((l) => (
-      <Grid
-        key={l.id}
-        item
-        xs={12}
-        sm={6}
-        md={4} // 3 ανά σειρά σε desktop
-        sx={{ display: "flex" }}
-      >
-        <Box sx={{ width: "100%" }}>
-          <LostPetCard
-            lost={l}
-            pet={petsById[l.petId]}
-           onOpen={() =>
-  navigate(`/lost/${l.id}`, {
-    state: { petName: petsById[l.petId]?.name },
-  })
-}
+          <Box sx={{ mt: 1, px: 1 }}>
+            <Grid container spacing={2} justifyContent="center">
+              {pageItems.map((l) => (
+                <Grid key={l.id} item xs={12} sm={6} md={4} sx={{ display: "flex" }}>
+                  <Box sx={{ width: "100%" }}>
+                    <LostPetCard
+                      lost={l}
+                      pet={petsById[l.petId]}
+                      onOpen={() =>
+                        navigate(`/lost/${l.id}`, {
+                          state: { petName: petsById[l.petId]?.name },
+                        })
+                      }
+                    />
+                  </Box>
+                </Grid>
+              ))}
+            </Grid>
+          </Box>
 
-          />
-        </Box>
-      </Grid>
-    ))}
-  </Grid>
-</Box>
-
-
-          {/* Pagination */}
           <Stack alignItems="center" sx={{ mt: 3 }}>
             <Pagination
               count={totalPages}

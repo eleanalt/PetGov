@@ -53,27 +53,34 @@ export default function Register() {
 
   const vetMode = role === "vet";
 
-  const requiredErrors = useMemo(() => {
-    const errs = {};
-    if (step !== 2) return errs;
+ const requiredErrors = useMemo(() => {
+  const errs = {};
+  if (step !== 2) return errs;
 
-    if (!fullName.trim()) errs.fullName = "Υποχρεωτικό";
-    if (!email.trim()) errs.email = "Υποχρεωτικό";
-    else if (!isValidEmail(email)) errs.email = "Μη έγκυρο email";
-    if (!phone.trim()) errs.phone = "Υποχρεωτικό";
-    if (!password.trim()) errs.password = "Υποχρεωτικό";
-    else if (password.trim().length < 4) errs.password = "Τουλάχιστον 4 χαρακτήρες";
+  if (!fullName.trim()) errs.fullName = "Υποχρεωτικό";
 
-    if (vetMode) {
-      if (!afm.trim()) errs.afm = "Υποχρεωτικό";
-      else if (!/^\d{9}$/.test(afm.trim())) errs.afm = "9 ψηφία";
-      if (!clinicName.trim()) errs.clinicName = "Υποχρεωτικό";
-      if (!clinicAddress.trim()) errs.clinicAddress = "Υποχρεωτικό";
-    }
-    return errs;
-  }, [step, fullName, email, phone, password, vetMode, afm, clinicName, clinicAddress]);
+  // ΑΦΜ ΥΠΟΧΡΕΩΤΙΚΟ ΓΙΑ ΟΛΟΥΣ
+  if (!afm.trim()) errs.afm = "Υποχρεωτικό";
+  else if (!/^\d{9}$/.test(afm.trim())) errs.afm = "9 ψηφία";
 
-  const canContinue = step === 1; // πάντα μπορείς να πας στο step2 (έχεις ήδη default επιλογή)
+  if (!email.trim()) errs.email = "Υποχρεωτικό";
+  else if (!isValidEmail(email)) errs.email = "Μη έγκυρο email";
+
+  if (!phone.trim()) errs.phone = "Υποχρεωτικό";
+
+  if (!password.trim()) errs.password = "Υποχρεωτικό";
+  else if (password.trim().length < 4) errs.password = "Τουλάχιστον 4 χαρακτήρες";
+
+  if (vetMode) {
+    if (!clinicName.trim()) errs.clinicName = "Υποχρεωτικό";
+    if (!clinicAddress.trim()) errs.clinicAddress = "Υποχρεωτικό";
+  }
+
+  return errs;
+}, [step, fullName, afm, email, phone, password, vetMode, clinicName, clinicAddress]);
+
+
+  const canContinue = step === 1; 
   const canSubmit = step === 2 && Object.keys(requiredErrors).length === 0;
 
   const goNext = () => {
@@ -229,6 +236,16 @@ export default function Register() {
             helperText={requiredErrors.fullName ?? " "}
             sx={{ mb: 1 }}
           />
+
+          <TextField
+                label="*Α.Φ.Μ."
+                fullWidth
+                value={afm}
+                onChange={(e) => setAfm(e.target.value)}
+                error={Boolean(requiredErrors.afm)}
+                helperText={requiredErrors.afm ?? " "}
+                sx={{ mb: 1 }}
+              />
 
           <TextField
             label="*Email"

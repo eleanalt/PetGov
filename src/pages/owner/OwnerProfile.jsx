@@ -30,7 +30,7 @@ function normalizeUser(obj) {
 
 function tryParse(raw) {
   if (!raw) return null;
-  // αν έχει αποθηκευτεί σκέτο id σαν string "2"
+
   if (/^\d+$/.test(raw)) return { id: raw };
   try {
     return JSON.parse(raw);
@@ -174,11 +174,10 @@ export default function VetProfile() {
     };
   }, []);
 
-  const [profile, setProfile] = useState(null); // “αποθηκευμένο”
-  const [draft, setDraft] = useState(null); // “προς αλλαγή”
+  const [profile, setProfile] = useState(null); 
+  const [draft, setDraft] = useState(null); 
   const [editMode, setEditMode] = useState(false);
 
-  // inline editing (ένα πεδίο κάθε φορά)
   const [activeField, setActiveField] = useState(null);
   const [activeValue, setActiveValue] = useState("");
 
@@ -217,11 +216,6 @@ export default function VetProfile() {
     { key: "email", label: "Email" },
     { key: "afm", label: "ΑΦΜ" },
     { key: "phone", label: "Τηλέφωνο" },
-    { key: "gender", label: "Φύλο" },
-    { key: "educationLevel", label: "Επίπεδο σπουδών" },
-    { key: "experienceYears", label: "Εμπειρία (έτη)", type: "number" },
-    { key: "clinicName", label: "Επωνυμία" },
-    { key: "clinicAddress", label: "Διεύθυνση" },
   ];
 
   const startEditField = (key) => {
@@ -276,7 +270,7 @@ export default function VetProfile() {
         {/* Title + right button */}
         <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
           <Typography variant="h3" fontWeight={900}>
-            Επαγγελματικό Προφίλ
+            Προφίλ Ιδιοκτήτη
           </Typography>
 
           {!editMode && (

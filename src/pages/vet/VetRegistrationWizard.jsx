@@ -1,40 +1,51 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   Box,
   Button,
   Card,
   CardContent,
   Container,
   Divider,
-  Grid,
   MenuItem,
   Stack,
   Step,
   StepLabel,
   Stepper,
   TextField,
-  Typography
+  Typography,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 
-const STEPS = ["Συμπλήρωση στοιχείων", "Προσωρινή αποθήκευση", "Οριστική υποβολή"];
+const steps = ["Συμπλήρωση στοιχείων", "Προσωρινή αποθήκευση", "Οριστική υποβολή"];
 
-const SPECIES = ["Σκύλος", "Γάτα", "Άλλο"];
-const SEX = ["Αρσενικό", "Θηλυκό"];
-const EVENT = ["Απώλεια", "Εύρεση", "Μεταβίβαση", "Υιοθεσία", "Αναδοχή"];
+function onlyDigits(s) {
+  return String(s || "").replace(/\D/g, "");
+}
 
-function PreviewRow({ label, value }) {
-  return (
-    <Stack direction="row" spacing={2} sx={{ py: 0.6 }}>
-      <Typography sx={{ width: 220 }} fontWeight={800}>
-        {label}
-      </Typography>
-      <Typography color="text.secondary">{value || "—"}</Typography>
-    </Stack>
-  );
+function isAdoptionOrFoster(lifeEvent) {
+  return lifeEvent === "Υιοθεσία" || lifeEvent === "Αναδοχή";
+}
+
+async function findOwnerByAfm(afm) {
+  const clean = onlyDigits(afm);
+  if (!clean) return null;
+
+  const res = await api.get("/users", { params: { role: "owner", afm: clean } });
+  const arr = Array.isArray(res.data) ? res.data : [];
+  return arr[0] || null;
+}
+
+async function findPetByMicrochip(microchip) {
+  const mc = onlyDigits(microchip);
+  if (!mc) return null;
+
+  const res = await api.get("/pets", { params: { microchip: mc } });
+  const arr = Array.isArray(res.data) ? res.data : [];
+  return arr[0] || null;
 }
 
 export default function VetRegistrationWizard() {
@@ -42,102 +53,292 @@ export default function VetRegistrationWizard() {
   const { user } = useAuth();
   const { regId } = useParams();
 
-  const [activeStep, setActiveStep] = useState(0);
+  const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
 
-  const [recordId, setRecordId] = useState(regId || null);
-  const [status, setStatus] = useState("draft"); // draft | submitted
+  const [pageMsg, setPageMsg] = useState(null);
+  // success screen after final submit
+  const [submitted, setSubmitted] = useState(false);
 
   const [form, setForm] = useState({
     microchip: "",
-    species: "Σκύλος",
-    sex: "Αρσενικό",
+    species: "",
+    sex: "",
     name: "",
     birthDate: "",
-    lifeEvent: "Απώλεια"
+    lifeEvent: "",
+    ownerAfm: "", 
   });
 
-  const set = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value }));
+  const showMsg = (type, text) => setPageMsg({ type, text });
+  const clearMsg = () => setPageMsg(null);
 
+  // Load existing registration if editing
   useEffect(() => {
-    if (!regId) return;
     (async () => {
+      if (!regId) return;
       try {
         const res = await api.get(`/petRegistrations/${regId}`);
-        const data = res.data ?? {};
-        setForm({
-          microchip: data.microchip ?? "",
-          species: data.species ?? "Σκύλος",
-          sex: data.sex ?? "Αρσενικό",
-          name: data.name ?? "",
-          birthDate: data.birthDate ?? "",
-          lifeEvent: data.lifeEvent ?? "Απώλεια"
-        });
-        setStatus(data.status ?? "draft");
-        setRecordId(data.id);
+        if (res?.data) {
+          setForm({
+            microchip: res.data.microchip ?? "",
+            species: res.data.species ?? "",
+            sex: res.data.sex ?? "",
+            name: res.data.name ?? "",
+            birthDate: res.data.birthDate ?? "",
+            lifeEvent: res.data.lifeEvent ?? "",
+            ownerAfm: res.data.ownerAfm ?? "",
+          });
+
+          // αν είναι submitted -> step 2, αλλιώς στο preview (step 1)
+          setStep(res.data.status === "submitted" ? 2 : 1);
+        }
       } catch (e) {
         console.error(e);
+        showMsg("error", "Δεν βρέθηκε η καταγραφή.");
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [regId]);
 
-  const canSubmit = useMemo(() => form.microchip.trim().length > 0, [form.microchip]);
+  const setField = (key) => (e) => {
+    clearMsg();
+    setForm((f) => ({ ...f, [key]: e.target.value }));
+  };
+
+  const isValid = useMemo(() => {
+    if (!onlyDigits(form.microchip)) return false;
+    if (!form.species) return false;
+    if (!form.sex) return false;
+    if (!form.lifeEvent) return false;
+
+    if (isAdoptionOrFoster(form.lifeEvent) && !onlyDigits(form.ownerAfm)) return false;
+
+    return true;
+  }, [form]);
+
+  const previewRows = useMemo(() => {
+    const rows = [
+      { label: "Αριθμός Μικροτσίπ", value: form.microchip || "—" },
+      { label: "Είδος κατοικιδίου", value: form.species || "—" },
+      { label: "Φύλο", value: form.sex || "—" },
+      { label: "Όνομα", value: form.name || "—" },
+      { label: "Ημερομηνία Γέννησης", value: form.birthDate || "—" },
+      { label: "Συμβάν ζωής", value: form.lifeEvent || "—" },
+    ];
+
+    if (isAdoptionOrFoster(form.lifeEvent)) {
+      rows.push({ label: "ΑΦΜ Ιδιοκτήτη", value: form.ownerAfm || "—" });
+    }
+
+    return rows;
+  }, [form]);
+
+  const ensureAuthAndValid = () => {
+    if (!onlyDigits(form.microchip)) {
+      showMsg("error", "Το μικροτσίπ είναι υποχρεωτικό.");
+      return false;
+    }
+    if (!form.species || !form.sex || !form.lifeEvent) {
+      showMsg("error", "Συμπλήρωσε τα υποχρεωτικά πεδία (*).");
+      return false;
+    }
+    if (isAdoptionOrFoster(form.lifeEvent) && !onlyDigits(form.ownerAfm)) {
+      showMsg("error", "Για Υιοθεσία/Αναδοχή το ΑΦΜ ιδιοκτήτη είναι υποχρεωτικό.");
+      return false;
+    }
+    if (!user?.id) {
+      showMsg("error", "Δεν βρέθηκε συνδεδεμένος χρήστης.");
+      return false;
+    }
+    return true;
+  };
 
   const saveDraft = async () => {
-    if (!canSubmit) {
-      alert("Το πεδίο Microchip είναι υποχρεωτικό.");
-      return;
-    }
+    clearMsg();
+    if (!ensureAuthAndValid()) return;
 
     setSaving(true);
     try {
-      const payload = {
-        ...form,
-        status: "draft",
-        vetUserId: user?.id ?? null,
-        updatedAt: new Date().toISOString()
-      };
-
-      if (recordId) {
-        await api.patch(`/petRegistrations/${recordId}`, payload);
-      } else {
-        const created = await api.post("/petRegistrations", { ...payload, createdAt: new Date().toISOString() });
-        setRecordId(created.data?.id);
+      let owner = null;
+      if (isAdoptionOrFoster(form.lifeEvent)) {
+        owner = await findOwnerByAfm(form.ownerAfm);
+        if (!owner?.id) {
+          showMsg("error", "Δεν βρέθηκε ιδιοκτήτης με αυτό το ΑΦΜ.");
+          setSaving(false);
+          return;
+        }
       }
 
-      setStatus("draft");
-      setActiveStep(1);
+      const payload = {
+        ...form,
+        microchip: onlyDigits(form.microchip),
+        ownerAfm: isAdoptionOrFoster(form.lifeEvent) ? onlyDigits(form.ownerAfm) : "",
+        ownerId: owner?.id ? String(owner.id) : "", 
+        vetUserId: String(user.id),
+        status: "draft",
+        updatedAt: new Date().toISOString(),
+      };
+
+      if (regId) {
+        await api.patch(`/petRegistrations/${regId}`, payload);
+        showMsg("success", "Έγινε προσωρινή αποθήκευση.");
+      } else {
+        const res = await api.post(`/petRegistrations`, {
+          ...payload,
+          createdAt: new Date().toISOString(),
+        });
+
+        const newId = res?.data?.id;
+        showMsg("success", "Έγινε προσωρινή αποθήκευση.");
+        if (newId) navigate(`/vet/registrations/${newId}`, { replace: true });
+      }
+
+      setStep(1);
     } catch (e) {
       console.error(e);
-      alert("Αποτυχία προσωρινής αποθήκευσης.");
+      showMsg("error", "Αποτυχία προσωρινής αποθήκευσης.");
     } finally {
       setSaving(false);
     }
   };
 
-  const finalSubmit = async () => {
-    if (!recordId) {
-      alert("Κάντε πρώτα προσωρινή αποθήκευση.");
-      return;
-    }
+  const submitFinal = async () => {
+    clearMsg();
+    if (!ensureAuthAndValid()) return;
+
     setSaving(true);
     try {
-      await api.patch(`/petRegistrations/${recordId}`, {
+      let owner = null;
+      if (isAdoptionOrFoster(form.lifeEvent)) {
+        owner = await findOwnerByAfm(form.ownerAfm);
+        if (!owner?.id) {
+          showMsg("error", "Δεν βρέθηκε ιδιοκτήτης με αυτό το ΑΦΜ.");
+          setSaving(false);
+          return;
+        }
+      }
+
+      const payload = {
         ...form,
+        microchip: onlyDigits(form.microchip),
+        ownerAfm: isAdoptionOrFoster(form.lifeEvent) ? onlyDigits(form.ownerAfm) : "",
+        ownerId: owner?.id ? String(owner.id) : "",
+        vetUserId: String(user.id),
         status: "submitted",
-        submittedAt: new Date().toISOString()
-      });
-      setStatus("submitted");
-      setActiveStep(2);
+        updatedAt: new Date().toISOString(),
+      };
+
+      // 1) submit registration
+      if (regId) {
+        await api.patch(`/petRegistrations/${regId}`, payload);
+      } else {
+        const res = await api.post(`/petRegistrations`, {
+          ...payload,
+          createdAt: new Date().toISOString(),
+        });
+        const newId = res?.data?.id;
+        if (newId) navigate(`/vet/registrations/${newId}`, { replace: true });
+      }
+
+      // 2) αν Υιοθεσία/Αναδοχή -> πέρασε το ζώο στα κατοικίδια του ιδιοκτήτη
+      if (isAdoptionOrFoster(form.lifeEvent) && owner?.id) {
+        const microchip = onlyDigits(form.microchip);
+        const existingPet = await findPetByMicrochip(microchip);
+
+        if (existingPet?.id) {
+          await api.patch(`/pets/${existingPet.id}`, {
+            ownerId: String(owner.id),
+            microchip,
+            name: form.name || existingPet.name || "",
+            species: form.species || existingPet.species || "",
+            sex: form.sex || existingPet.sex || existingPet.gender || "", 
+            gender: form.sex || existingPet.gender || existingPet.sex || "", 
+            birthDate: form.birthDate || existingPet.birthDate || "",
+            updatedAt: new Date().toISOString(),
+          });
+        } else {
+          await api.post("/pets", {
+            ownerId: String(owner.id),
+            microchip,
+            name: form.name || "",
+            species: form.species || "",
+            sex: form.sex || "",
+            gender: form.sex || "",
+            birthDate: form.birthDate || "",
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
+        }
+      }
+
+      setSubmitted(true);
+      showMsg("success", "Η καταγραφή υποβλήθηκε οριστικά.");
     } catch (e) {
       console.error(e);
-      alert("Αποτυχία οριστικής υποβολής.");
+      showMsg("error", "Αποτυχία οριστικής υποβολής.");
     } finally {
       setSaving(false);
     }
   };
 
-  const readOnly = status === "submitted";
+  // Success screen after submit
+  if (submitted) {
+    return (
+      <Box sx={{ bgcolor: "grey.100", minHeight: "calc(100vh - 76px)", py: 4 }}>
+        <Container maxWidth="lg">
+          <Button
+            startIcon={<ArrowBackIcon />}
+            onClick={() => navigate("/vet/registrations")}
+            sx={{ textTransform: "none", mb: 2 }}
+          >
+            Επιστροφή στις καταγραφές
+          </Button>
+
+          <Card variant="outlined" sx={{ borderRadius: 3 }}>
+            <CardContent sx={{ p: { xs: 2.5, md: 4 } }}>
+              <Typography variant="h4" fontWeight={900} sx={{ mb: 2 }}>
+                Ολοκληρώθηκε
+              </Typography>
+
+              {pageMsg && (
+                <Alert severity={pageMsg.type} onClose={clearMsg} sx={{ mb: 2 }}>
+                  {pageMsg.text}
+                </Alert>
+              )}
+
+              <Card variant="outlined" sx={{ borderRadius: 2 }}>
+                <CardContent>
+                  <Typography fontWeight={900} sx={{ mb: 1.5 }}>
+                    Στοιχεία καταγραφής
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
+
+                  <Stack spacing={1.4}>
+                    {previewRows.map((r) => (
+                      <PreviewRow key={r.label} label={r.label} value={r.value} />
+                    ))}
+                  </Stack>
+
+                  <Stack direction="row" justifyContent="center" sx={{ mt: 3 }}>
+                    <Button
+                      variant="contained"
+                      onClick={() => navigate("/vet/registrations")}
+                      sx={{ textTransform: "none", borderRadius: 2, px: 4, fontWeight: 900 }}
+                    >
+                      Επιστροφή στις καταγραφές
+                    </Button>
+                  </Stack>
+                </CardContent>
+              </Card>
+            </CardContent>
+          </Card>
+        </Container>
+      </Box>
+    );
+  }
+
+  const needsAfm = isAdoptionOrFoster(form.lifeEvent);
 
   return (
     <Box sx={{ bgcolor: "grey.100", minHeight: "calc(100vh - 76px)", py: 4 }}>
@@ -150,214 +351,252 @@ export default function VetRegistrationWizard() {
           Επιστροφή
         </Button>
 
-        <Card variant="outlined" sx={{ borderRadius: 2 }}>
+        <Card variant="outlined" sx={{ borderRadius: 3 }}>
           <CardContent sx={{ p: { xs: 2.5, md: 4 } }}>
-            <Typography variant="h5" fontWeight={900} sx={{ mb: 2 }}>
+            <Typography variant="h4" fontWeight={900} sx={{ mb: 2 }}>
               Νέα καταγραφή
             </Typography>
 
-            <Box sx={{ maxWidth: 720, mx: "auto" }}>
-              <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 3 }}>
-                {STEPS.map((label) => (
-                  <Step key={label}>
-                    <StepLabel>{label}</StepLabel>
-                  </Step>
-                ))}
-              </Stepper>
+            {pageMsg && (
+              <Alert severity={pageMsg.type} onClose={clearMsg} sx={{ mb: 2 }}>
+                {pageMsg.text}
+              </Alert>
+            )}
 
-              <Card variant="outlined" sx={{ borderRadius: 2, bgcolor: "grey.50" }}>
-                <CardContent sx={{ p: { xs: 2, md: 3 } }}>
-                  {activeStep === 0 && (
-                    <>
-                      <Stack spacing={2}>
-                        <TextField
-                          label="*Αριθμός microchip"
-                          value={form.microchip}
-                          onChange={set("microchip")}
-                          disabled={readOnly}
-                          placeholder="π.χ. 123456789"
-                          fullWidth
-                        />
+            <Stepper activeStep={step} alternativeLabel sx={{ mb: 3 }}>
+              {steps.map((label) => (
+                <Step key={label}>
+                  <StepLabel>{label}</StepLabel>
+                </Step>
+              ))}
+            </Stepper>
 
-                        <TextField
-                          select
-                          label="*Είδος κατοικιδίου"
-                          value={form.species}
-                          onChange={set("species")}
-                          disabled={readOnly}
-                          fullWidth
-                        >
-                          {SPECIES.map((x) => (
-                            <MenuItem key={x} value={x}>
-                              {x}
-                            </MenuItem>
-                          ))}
-                        </TextField>
+            {/* STEP 1: Form */}
+            {step === 0 && (
+              <Box sx={{ maxWidth: 560, mx: "auto" }}>
+                <Stack spacing={2}>
+                  <TextField
+                    label="* Αριθμός Microchip"
+                    value={form.microchip}
+                    onChange={setField("microchip")}
+                    fullWidth
+                  />
 
-                        <TextField
-                          select
-                          label="*Φύλο"
-                          value={form.sex}
-                          onChange={set("sex")}
-                          disabled={readOnly}
-                          fullWidth
-                        >
-                          {SEX.map((x) => (
-                            <MenuItem key={x} value={x}>
-                              {x}
-                            </MenuItem>
-                          ))}
-                        </TextField>
+                  <TextField
+                    select
+                    label="* Είδος κατοικιδίου"
+                    value={form.species}
+                    onChange={setField("species")}
+                    fullWidth
+                  >
+                    <MenuItem value="Σκύλος">Σκύλος</MenuItem>
+                    <MenuItem value="Γάτα">Γάτα</MenuItem>
+                    <MenuItem value="Άλλο">Άλλο</MenuItem>
+                  </TextField>
 
-                        <TextField
-                          label="Όνομα"
-                          value={form.name}
-                          onChange={set("name")}
-                          disabled={readOnly}
-                          placeholder="π.χ. Τσίτσι"
-                          fullWidth
-                        />
+                  <TextField
+                    select
+                    label="* Φύλο"
+                    value={form.sex}
+                    onChange={setField("sex")}
+                    fullWidth
+                  >
+                    <MenuItem value="Αρσενικό">Αρσενικό</MenuItem>
+                    <MenuItem value="Θηλυκό">Θηλυκό</MenuItem>
+                  </TextField>
 
-                        <TextField
-                          label="Ημερομηνία Γέννησης"
-                          type="date"
-                          value={form.birthDate}
-                          onChange={set("birthDate")}
-                          disabled={readOnly}
-                          fullWidth
-                          InputLabelProps={{ shrink: true }}
-                        />
+                  <TextField label="Όνομα" value={form.name} onChange={setField("name")} fullWidth />
 
-                        <TextField
-                          select
-                          label="*Συμβάν ζωής"
-                          value={form.lifeEvent}
-                          onChange={set("lifeEvent")}
-                          disabled={readOnly}
-                          fullWidth
-                        >
-                          {EVENT.map((x) => (
-                            <MenuItem key={x} value={x}>
-                              {x}
-                            </MenuItem>
-                          ))}
-                        </TextField>
-                      </Stack>
+                  <TextField
+                    label="Ημερομηνία Γέννησης"
+                    type="date"
+                    value={form.birthDate}
+                    onChange={setField("birthDate")}
+                    fullWidth
+                    InputLabelProps={{ shrink: true }}
+                  />
 
-                      <Stack alignItems="center" sx={{ mt: 3 }}>
-                        <Button
-                          variant="contained"
-                          onClick={() => setActiveStep(1)}
-                          disabled={!canSubmit}
-                          sx={{ textTransform: "none", fontWeight: 900, borderRadius: 2, px: 6 }}
-                        >
-                          Συνέχεια
-                        </Button>
-                      </Stack>
+                  <TextField
+                    select
+                    label="* Συμβάν ζωής"
+                    value={form.lifeEvent}
+                    onChange={setField("lifeEvent")}
+                    fullWidth
+                  >
+                    <MenuItem value="Απώλεια">Απώλεια</MenuItem>
+                    <MenuItem value="Εύρεση">Εύρεση</MenuItem>
+                    <MenuItem value="Μεταβίβαση">Μεταβίβαση</MenuItem>
+                    <MenuItem value="Υιοθεσία">Υιοθεσία</MenuItem>
+                    <MenuItem value="Αναδοχή">Αναδοχή</MenuItem>
+                  </TextField>
 
-                      <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
-                        Τα πεδία με αστερίσκο (*) είναι υποχρεωτικά
-                      </Typography>
-                    </>
+                  {/* ✅ ΑΦΜ ιδιοκτήτη μόνο για Υιοθεσία/Αναδοχή */}
+                  {needsAfm && (
+                    <TextField
+                      label="* ΑΦΜ Ιδιοκτήτη"
+                      value={form.ownerAfm}
+                      onChange={setField("ownerAfm")}
+                      fullWidth
+                      helperText="Απαιτείται για Υιοθεσία/Αναδοχή"
+                    />
                   )}
 
-                  {activeStep === 1 && (
-                    <>
-                      <Typography fontWeight={900} sx={{ mb: 1 }}>
-                        Προεπισκόπηση στοιχείων
-                      </Typography>
+                  <Stack direction="row" justifyContent="center" spacing={2} sx={{ pt: 2 }}>
+                    <Button
+                      variant="contained"
+                      onClick={() => {
+                        clearMsg();
+                        if (!ensureAuthAndValid()) return;
+                        setStep(1);
+                      }}
+                      sx={{ textTransform: "none", fontWeight: 900, borderRadius: 2, px: 4 }}
+                      disabled={!isValid}
+                    >
+                      Συνέχεια
+                    </Button>
+                  </Stack>
 
-                      <Divider sx={{ mb: 2 }} />
+                  <Typography variant="caption" color="text.secondary" sx={{ textAlign: "center" }}>
+                    Τα πεδία με αστερίσκο (*) είναι υποχρεωτικά
+                  </Typography>
+                </Stack>
+              </Box>
+            )}
 
-                      <PreviewRow label="Αριθμός Μικροτσίπ" value={form.microchip} />
-                      <PreviewRow label="Είδος κατοικιδίου" value={form.species} />
-                      <PreviewRow label="Φύλο" value={form.sex} />
-                      <PreviewRow label="Όνομα" value={form.name} />
-                      <PreviewRow label="Ημερομηνία Γέννησης" value={form.birthDate} />
-                      <PreviewRow label="Συμβάν ζωής" value={form.lifeEvent} />
+            {/* STEP 2: Preview + Draft */}
+            {step === 1 && (
+              <Box sx={{ maxWidth: 640, mx: "auto" }}>
+                <Card variant="outlined" sx={{ borderRadius: 2 }}>
+                  <CardContent>
+                    <Typography fontWeight={900} sx={{ mb: 1.5 }}>
+                      Προεπισκόπηση στοιχείων
+                    </Typography>
+                    <Divider sx={{ mb: 2 }} />
 
-                      <Stack direction="row" spacing={2} sx={{ mt: 3 }} justifyContent="space-between">
-                        <Button
-                          variant="outlined"
-                          onClick={() => setActiveStep(0)}
-                          sx={{ textTransform: "none", borderRadius: 2 }}
-                        >
-                          Προηγούμενο
-                        </Button>
+                    <Stack spacing={1.4}>
+                      {previewRows.map((r) => (
+                        <PreviewRow key={r.label} label={r.label} value={r.value} />
+                      ))}
+                    </Stack>
 
-                        <Stack direction="row" spacing={2}>
-                          <Button
-                            variant="contained"
-                            onClick={saveDraft}
-                            disabled={saving || readOnly}
-                            sx={{ textTransform: "none", borderRadius: 2, fontWeight: 900 }}
-                          >
-                            Προσωρινή Αποθήκευση
-                          </Button>
+                    <Stack direction="row" justifyContent="space-between" sx={{ mt: 3 }}>
+                      <Button
+                        variant="outlined"
+                        onClick={() => {
+                          clearMsg();
+                          setStep(0);
+                        }}
+                        sx={{ textTransform: "none", borderRadius: 2, px: 3 }}
+                        disabled={saving}
+                      >
+                        Προηγούμενο
+                      </Button>
 
-                          <Button
-                            variant="outlined"
-                            onClick={() => setActiveStep(2)}
-                            sx={{ textTransform: "none", borderRadius: 2 }}
-                          >
-                            Επόμενο
-                          </Button>
-                        </Stack>
-                      </Stack>
-
-                      <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
-                        Τα πεδία με αστερίσκο (*) είναι υποχρεωτικά
-                      </Typography>
-                    </>
-                  )}
-
-                  {activeStep === 2 && (
-                    <>
-                      <Typography fontWeight={900} sx={{ mb: 1 }}>
-                        Οριστική υποβολή
-                      </Typography>
-
-                      <Divider sx={{ mb: 2 }} />
-
-                      <PreviewRow label="Αριθμός Μικροτσίπ" value={form.microchip} />
-                      <PreviewRow label="Είδος κατοικιδίου" value={form.species} />
-                      <PreviewRow label="Φύλο" value={form.sex} />
-                      <PreviewRow label="Όνομα" value={form.name} />
-                      <PreviewRow label="Ημερομηνία Γέννησης" value={form.birthDate} />
-                      <PreviewRow label="Συμβάν ζωής" value={form.lifeEvent} />
-
-                      <Stack direction="row" spacing={2} sx={{ mt: 3 }} justifyContent="space-between">
-                        <Button
-                          variant="outlined"
-                          onClick={() => setActiveStep(1)}
-                          sx={{ textTransform: "none", borderRadius: 2 }}
-                        >
-                          Προηγούμενο
-                        </Button>
-
+                      <Stack direction="row" spacing={2}>
                         <Button
                           variant="contained"
-                          onClick={finalSubmit}
-                          disabled={saving || readOnly}
-                          sx={{ textTransform: "none", borderRadius: 2, fontWeight: 900, px: 4 }}
+                          onClick={saveDraft}
+                          sx={{ textTransform: "none", borderRadius: 2, px: 3, fontWeight: 900 }}
+                          disabled={saving}
                         >
-                          Οριστική Υποβολή
+                          Προσωρινή Αποθήκευση
+                        </Button>
+
+                        <Button
+                          variant="outlined"
+                          onClick={() => {
+                            clearMsg();
+                            setStep(2);
+                          }}
+                          sx={{ textTransform: "none", borderRadius: 2, px: 3 }}
+                          disabled={saving}
+                        >
+                          Επόμενο
                         </Button>
                       </Stack>
+                    </Stack>
 
-                      {readOnly && (
-                        <Typography color="text.secondary" sx={{ mt: 2 }}>
-                          Η καταγραφή έχει υποβληθεί οριστικά και δεν μπορεί να επεξεργαστεί.
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ display: "block", mt: 1.5 }}
+                    >
+                      Τα πεδία με αστερίσκο (*) είναι υποχρεωτικά
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Box>
+            )}
+
+            {/* STEP 3: Final submit + show details */}
+            {step === 2 && (
+              <Box sx={{ maxWidth: 640, mx: "auto" }}>
+                <Card variant="outlined" sx={{ borderRadius: 2 }}>
+                  <CardContent>
+                    <Typography fontWeight={900} sx={{ mb: 1.5 }}>
+                      Οριστική υποβολή
+                    </Typography>
+                    <Divider sx={{ mb: 2 }} />
+
+                    <Typography color="text.secondary" sx={{ mb: 2 }}>
+                      Ελέγξτε τα στοιχεία και προχωρήστε σε οριστική υποβολή.
+                    </Typography>
+
+                    <Card variant="outlined" sx={{ borderRadius: 2, mb: 2 }}>
+                      <CardContent>
+                        <Typography fontWeight={900} sx={{ mb: 1.5 }}>
+                          Στοιχεία καταγραφής
                         </Typography>
-                      )}
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-            </Box>
+                        <Divider sx={{ mb: 2 }} />
+
+                        <Stack spacing={1.4}>
+                          {previewRows.map((r) => (
+                            <PreviewRow key={r.label} label={r.label} value={r.value} />
+                          ))}
+                        </Stack>
+                      </CardContent>
+                    </Card>
+
+                    <Stack direction="row" justifyContent="space-between">
+                      <Button
+                        variant="outlined"
+                        onClick={() => {
+                          clearMsg();
+                          setStep(1);
+                        }}
+                        sx={{ textTransform: "none", borderRadius: 2, px: 3 }}
+                        disabled={saving}
+                      >
+                        Προηγούμενο
+                      </Button>
+
+                      <Button
+                        variant="contained"
+                        onClick={submitFinal}
+                        sx={{ textTransform: "none", borderRadius: 2, px: 4, fontWeight: 900 }}
+                        disabled={saving}
+                      >
+                        Οριστική Υποβολή
+                      </Button>
+                    </Stack>
+                  </CardContent>
+                </Card>
+              </Box>
+            )}
           </CardContent>
         </Card>
       </Container>
     </Box>
+  );
+}
+
+function PreviewRow({ label, value }) {
+  return (
+    <Stack direction="row" spacing={2}>
+      <Typography sx={{ width: 220, fontWeight: 800 }}>{label}</Typography>
+      <Typography sx={{ color: value === "—" ? "text.secondary" : "text.primary" }}>
+        {value}
+      </Typography>
+    </Stack>
   );
 }
