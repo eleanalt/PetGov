@@ -9,17 +9,18 @@ import {
   MenuItem,
   Stack,
   Toolbar,
-  Typography
+  Typography,
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { Link as RouterLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import SiteFooter from "../components/SiteFooter";
 import {
   MAIN_NAV,
   USER_MENU,
   ROLE_LABELS,
   isAllowed,
-  effectiveRole
+  effectiveRole,
 } from "../routes/menuConfig";
 
 export default function AppLayout() {
@@ -59,7 +60,7 @@ export default function AppLayout() {
           sx={{
             minHeight: 76,
             px: { xs: 2, md: 3 },
-            gap: 2
+            gap: 2,
           }}
         >
           {/* Left: Brand */}
@@ -71,7 +72,7 @@ export default function AppLayout() {
               color: "inherit",
               textDecoration: "none",
               fontWeight: 800,
-              letterSpacing: 0.5
+              letterSpacing: 0.5,
             }}
           >
             PETGOV
@@ -91,7 +92,7 @@ export default function AppLayout() {
                     fontSize: 16,
                     px: 2,
                     borderRadius: 2,
-                    "&:hover": { bgcolor: "rgba(255,255,255,0.12)" }
+                    "&:hover": { bgcolor: "rgba(255,255,255,0.12)" },
                   }}
                 >
                   {item.label}
@@ -103,7 +104,6 @@ export default function AppLayout() {
           {/* Right: auth buttons / dropdown */}
           {!user ? (
             <Stack direction="row" spacing={1} alignItems="center">
-              {/* Εγγραφή: outlined/λευκό */}
               <Button
                 component={RouterLink}
                 to="/register"
@@ -117,14 +117,13 @@ export default function AppLayout() {
                   borderRadius: 2,
                   "&:hover": {
                     borderColor: "rgba(255,255,255,1)",
-                    bgcolor: "rgba(255,255,255,0.08)"
-                  }
+                    bgcolor: "rgba(255,255,255,0.08)",
+                  },
                 }}
               >
                 Εγγραφή
               </Button>
 
-              {/* Σύνδεση: filled */}
               <Button
                 component={RouterLink}
                 to="/login"
@@ -136,7 +135,7 @@ export default function AppLayout() {
                   borderRadius: 2,
                   bgcolor: "rgba(255,255,255,0.92)",
                   color: "text.primary",
-                  "&:hover": { bgcolor: "rgba(255,255,255,1)" }
+                  "&:hover": { bgcolor: "rgba(255,255,255,1)" },
                 }}
               >
                 Σύνδεση
@@ -158,7 +157,7 @@ export default function AppLayout() {
                   borderRadius: 2,
                   bgcolor: "rgba(255,255,255,0.15)",
                   px: 1.5,
-                  py: 1
+                  py: 1,
                 }}
               >
                 {ROLE_LABELS[role] ?? role}
@@ -197,10 +196,13 @@ export default function AppLayout() {
         </Toolbar>
       </AppBar>
 
-      {/* ✅ Αυτό είναι το fix: padding-top για να μην κολλάει το περιεχόμενο στο navbar */}
+      {/* content */}
       <Box sx={{ flexGrow: 1, pt: 4 }}>
         <Outlet />
       </Box>
+
+      {/* footer σε ΟΛΕΣ τις σελίδες */}
+      <SiteFooter />
     </Box>
   );
 }

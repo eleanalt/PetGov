@@ -25,6 +25,7 @@ import OwnerVetDetails from "./pages/owner/OwnerVetDetails";
 import OwnerAppointmentWizard from "./pages/owner/OwnerAppointmentWizard";
 import OwnerReview from "./pages/owner/OwnerReview";
 import OwnerProfile from "./pages/owner/OwnerProfile";
+import OwnerLayout from "./layouts/OwnerLayout";
 
 import VetActs from "./pages/vet/VetActs";
 import VetActNew from "./pages/vet/VetActNew";
@@ -63,31 +64,34 @@ export default function App() {
         <Route path="/info/citizens" element={<CitizensFaq />} />
 
         {/* Owner protected */}
-        <Route element={<RequireAuth allowedRoles={["owner"]} />}>
-          <Route path="/owner" element={<OwnerGuide />} />
-          <Route path="/owner/pets" element={<OwnerPets />} />
-          <Route path="/owner/appointments" element={<OwnerAppointments />} />
-          <Route path="/owner/lost" element={<OwnerLost />} />
-          <Route path="/owner/healthbook/:petId" element={<OwnerHealthBook />} />
-          <Route path="/owner/guide" element={<OwnerGuide />} />
-          <Route path="/owner/found/:id" element={<OwnerFoundView />} />
-          <Route path="/owner/found/view" element={<OwnerFoundView />} /> 
-          <Route path="/owner/pets/:petId/healthbook" element={<OwnerHealthBook />} />
-          <Route path="/owner/lost" element={<OwnerLost />} />
-          <Route path="/owner/lost/history" element={<OwnerLostHistory />} />
-          <Route path="/owner/appointments/new" element={<OwnerAppointmentSearch />} />
-          <Route path="/owner/appointments/vet/:vetId" element={<OwnerVetDetails />} />
-          <Route path="/owner/appointments/review/:appointmentId" element={<OwnerReview />} />
-          <Route path="/owner/appointments/new" element={<OwnerAppointmentWizard />} />
-          <Route path="/owner/appointments/new/:vetId" element={<OwnerAppointmentWizard />} />
-          <Route path="/owner/profile" element={<OwnerProfile />} />
+       {/* Owner protected */}
+<Route element={<RequireAuth allowedRoles={["owner"]} />}>
+  <Route path="/owner" element={<OwnerLayout />}>
+    {/* default owner page */}
+    <Route index element={<OwnerGuide />} />
 
-          <Route path="/owner/lost/new" element={<OwnerLostWizard />} />
-          <Route path="/owner/lost/:lostId" element={<OwnerLostWizard />} />        {/* view */}
-          <Route path="/owner/lost/:lostId/edit" element={<OwnerLostWizard />} />   {/* edit draft */}
+    <Route path="pets" element={<OwnerPets />} />
+    <Route path="pets/:petId/healthbook" element={<OwnerHealthBook />} />
 
-          <Route path="/owner/found" element={<OwnerFoundMine />} />
-        </Route>
+    <Route path="appointments" element={<OwnerAppointments />} />
+    <Route path="appointments/search" element={<OwnerAppointmentSearch />} />
+    <Route path="appointments/vet/:vetId" element={<OwnerVetDetails />} />
+    <Route path="appointments/review/:appointmentId" element={<OwnerReview />} />
+    <Route path="appointments/new/:vetId" element={<OwnerAppointmentWizard />} />
+
+    <Route path="lost" element={<OwnerLost />} />
+    <Route path="lost/history" element={<OwnerLostHistory />} />
+    <Route path="lost/new" element={<OwnerLostWizard />} />
+    <Route path="lost/:lostId" element={<OwnerLostWizard />} />
+    <Route path="lost/:lostId/edit" element={<OwnerLostWizard />} />
+
+    <Route path="found" element={<OwnerFoundMine />} />
+    <Route path="found/:id" element={<OwnerFoundView />} />
+    <Route path="found/view" element={<OwnerFoundView />} />
+
+    <Route path="profile" element={<OwnerProfile />} />
+  </Route>
+</Route>
 
         {/* Vet protected */}
         <Route element={<RequireAuth allowedRoles={["vet"]} />}>

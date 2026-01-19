@@ -18,6 +18,7 @@ import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import { useNavigate } from "react-router-dom";
 import { api } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
+import VetBreadcrumbs from "../../components/OwnerBreadcrumbs";
 
 const STATUS_META = {
   pending: { label: "Εκκρεμές", color: "default" },
