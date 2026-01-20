@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Box,
   Button,
@@ -17,11 +17,10 @@ import EditIcon from "@mui/icons-material/Edit";
 import CheckIcon from "@mui/icons-material/Check";
 import CloseIcon from "@mui/icons-material/Close";
 import PhotoCameraOutlinedIcon from "@mui/icons-material/PhotoCameraOutlined";
-import VetBreadcrumbs from "../../components/VetBreadcrumbs";
 import { useNavigate } from "react-router-dom";
 import { api } from "../../api/client";
 
-/** ===== helpers για να βρίσκει τον logged-in χρήστη από storage ===== */
+
 function normalizeUser(obj) {
   if (!obj) return null;
   if (obj.user?.id) return obj.user;
@@ -97,6 +96,38 @@ function PhotoPlaceholder() {
   );
 }
 
+/** ✅ File -> base64 dataUrl */
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("FileReader error"));
+    reader.onload = () => resolve(reader.result);
+    reader.readAsDataURL(file);
+  });
+}
+
+/** ✅ validation per field (σαν OwnerProfile) */
+function validateField(key, rawValue) {
+  const v = String(rawValue ?? "").trim();
+
+  // required για όλα τα fields του profile
+  if (!v) return "Το πεδίο είναι υποχρεωτικό.";
+
+  // ειδικοί έλεγχοι
+  if (key === "email" && !/^\S+@\S+\.\S+$/.test(v)) return "Μη έγκυρο email.";
+  if (key === "afm" && !/^\d{9}$/.test(v)) return "Το ΑΦΜ πρέπει να έχει 9 ψηφία.";
+  if (key === "phone" && !/^\d{10}$/.test(v)) return "Το τηλέφωνο πρέπει να έχει 10 ψηφία.";
+
+  if (key === "experienceYears") {
+    // εδώ έρχεται ως string από select
+    if (!/^\d+$/.test(v)) return "Δώσε έτη εμπειρίας (0-40).";
+    const n = Number(v);
+    if (n < 0 || n > 40) return "Δώσε έτη εμπειρίας (0-40).";
+  }
+
+  return "";
+}
+
 function Row({
   label,
   value,
@@ -107,8 +138,10 @@ function Row({
   onSave,
   inputValue,
   setInputValue,
+  errorText,
   type = "text",
-  options = null, // ✅ αν έχει options => dropdown
+  options = null, // dropdown
+  saveDisabled = false, // ✅ για να κλειδώνει το ✔
 }) {
   const isSelect = Array.isArray(options) && options.length > 0;
 
@@ -133,6 +166,8 @@ function Row({
                   type={isSelect ? "text" : type}
                   placeholder="—"
                   select={isSelect}
+                  error={!!errorText}
+                  helperText={errorText || " "}
                 >
                   {isSelect &&
                     options.map((opt) => (
@@ -142,18 +177,18 @@ function Row({
                     ))}
                 </TextField>
 
-                <IconButton onClick={onSave} aria-label="save">
+                {/* ✅ Δεν μπορεί να πατήσει ✔ αν είναι άδειο/invalid */}
+                <IconButton onClick={onSave} aria-label="save" disabled={saveDisabled}>
                   <CheckIcon />
                 </IconButton>
+
                 <IconButton onClick={onCancel} aria-label="cancel">
                   <CloseIcon />
                 </IconButton>
               </Stack>
             ) : (
               <Stack direction="row" alignItems="center" spacing={1}>
-                <Typography
-                  sx={{ color: value ? "text.primary" : "text.secondary", flex: 1 }}
-                >
+                <Typography sx={{ color: value ? "text.primary" : "text.secondary", flex: 1 }}>
                   {value || "—"}
                 </Typography>
                 <IconButton onClick={onStartEdit} aria-label="edit">
@@ -186,13 +221,17 @@ export default function VetProfile() {
     };
   }, []);
 
-  const [profile, setProfile] = useState(null); // “αποθηκευμένο”
-  const [draft, setDraft] = useState(null); // “προς αλλαγή”
+  const [profile, setProfile] = useState(null);
+  const [draft, setDraft] = useState(null);
   const [editMode, setEditMode] = useState(false);
 
-  // inline editing (ένα πεδίο κάθε φορά)
+  // inline editing
   const [activeField, setActiveField] = useState(null);
   const [activeValue, setActiveValue] = useState("");
+  const [errors, setErrors] = useState({});
+
+  // avatar upload
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     (async () => {
@@ -211,14 +250,9 @@ export default function VetProfile() {
             Δεν βρέθηκε συνδεδεμένος χρήστης
           </Typography>
           <Typography color="text.secondary" sx={{ mt: 1 }}>
-            Κάνε login και βεβαιώσου ότι αποθηκεύεις τον χρήστη στο localStorage ή
-            sessionStorage.
+            Κάνε login και βεβαιώσου ότι αποθηκεύεις τον χρήστη στο localStorage ή sessionStorage.
           </Typography>
-          <Button
-            sx={{ mt: 2 }}
-            variant="contained"
-            onClick={() => navigate("/login")}
-          >
+          <Button sx={{ mt: 2 }} variant="contained" onClick={() => navigate("/login")}>
             Σύνδεση
           </Button>
         </Container>
@@ -274,19 +308,19 @@ export default function VetProfile() {
 
   const startEditField = (key) => {
     setActiveField(key);
+    setErrors((e) => ({ ...e, [key]: "" }));
 
-    // ✅ Αν είναι experienceYears, πάντα string στο input (για select)
+    // select θέλει string
     if (key === "experienceYears") {
-      setActiveValue(
-        (draft?.[key] ?? draft?.[key] === 0) ? String(draft?.[key]) : ""
-      );
+      const v = draft?.[key];
+      setActiveValue(v === 0 ? "0" : v ? String(v) : "");
       return;
     }
-
     setActiveValue(draft?.[key] ?? "");
   };
 
   const cancelEditField = () => {
+    if (activeField) setErrors((e) => ({ ...e, [activeField]: "" }));
     setActiveField(null);
     setActiveValue("");
   };
@@ -294,14 +328,18 @@ export default function VetProfile() {
   const saveEditFieldToDraft = () => {
     if (!activeField) return;
 
-    let v = activeValue;
-
-    // ✅ αποθήκευση years σαν number
-    if (activeField === "experienceYears") {
-      v = v === "" ? "" : Number(v);
+    const err = validateField(activeField, activeValue);
+    if (err) {
+      setErrors((e) => ({ ...e, [activeField]: err }));
+      return; // ⛔ μην κλείνεις edit
     }
 
+    // εμπειρία: number
+    let v = String(activeValue ?? "").trim();
+    if (activeField === "experienceYears") v = Number(v);
+
     setDraft((d) => ({ ...d, [activeField]: v }));
+    setErrors((e) => ({ ...e, [activeField]: "" }));
     setActiveField(null);
     setActiveValue("");
   };
@@ -310,9 +348,16 @@ export default function VetProfile() {
     setDraft(profile);
     setEditMode(false);
     cancelEditField();
+    setErrors({});
   };
 
   const finishEdit = async () => {
+    // (προαιρετικά) αν θες τελικό validate σε ΟΛΑ πριν σώσεις:
+    // const nextErrors = {};
+    // fields.forEach(f => { nextErrors[f.key] = validateField(f.key, draft?.[f.key]); });
+    // const hasErr = Object.values(nextErrors).some(Boolean);
+    // if (hasErr) { setErrors(nextErrors); return; }
+
     const payload = {
       ...draft,
       role: profile.role || "vet",
@@ -324,12 +369,51 @@ export default function VetProfile() {
 
     setEditMode(false);
     cancelEditField();
+    setErrors({});
   };
+
+  // avatar
+  const onPickPhoto = () => {
+    if (!editMode) return;
+    fileInputRef.current?.click();
+  };
+
+  const onPhotoSelected = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      alert("Διάλεξε αρχείο εικόνας (png/jpg/webp).");
+      e.target.value = "";
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      alert("Η εικόνα είναι πολύ μεγάλη (max 2MB).");
+      e.target.value = "";
+      return;
+    }
+
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      setDraft((d) => ({ ...d, avatarDataUrl: dataUrl }));
+    } catch {
+      alert("Αποτυχία φόρτωσης εικόνας.");
+    } finally {
+      e.target.value = "";
+    }
+  };
+
+  const avatarSrc = draft?.avatarDataUrl || profile?.avatarDataUrl;
+
+  // ✅ disable ✔ όταν είναι άδειο/invalid live
+  const activeErrorLive = activeField ? validateField(activeField, activeValue) : "";
+  const saveDisabled = !!activeField && !!activeErrorLive;
 
   return (
     <Box sx={{ bgcolor: "grey.100", minHeight: "calc(100vh - 76px)", py: 4 }}>
       <Container maxWidth="lg">
-        <VetBreadcrumbs />
+
         <Button
           startIcon={<ArrowBackIcon />}
           onClick={() => navigate("/")}
@@ -338,12 +422,7 @@ export default function VetProfile() {
           Επιστροφή στην αρχική σελίδα
         </Button>
 
-        <Stack
-          direction="row"
-          alignItems="center"
-          justifyContent="space-between"
-          sx={{ mb: 2 }}
-        >
+        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
           <Typography variant="h3" fontWeight={900}>
             Επαγγελματικό Προφίλ
           </Typography>
@@ -362,88 +441,103 @@ export default function VetProfile() {
 
         <Card variant="outlined" sx={{ borderRadius: 6 }}>
           <CardContent sx={{ p: { xs: 2, md: 3 } }}>
-            <Box
-              sx={{
-                display: { xs: "block", md: "flex" },
-                gap: 3,
-                alignItems: "flex-start",
-              }}
-            >
+            <Box sx={{ display: { xs: "block", md: "flex" }, gap: 3, alignItems: "flex-start" }}>
               {/* Left photo */}
               <Box sx={{ width: { xs: "100%", md: 360 } }}>
-                <PhotoPlaceholder />
+                <Box
+                  sx={{
+                    width: "100%",
+                    height: 220,
+                    borderRadius: 6,
+                    bgcolor: "grey.300",
+                    overflow: "hidden",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  {avatarSrc ? (
+                    <Box
+                      component="img"
+                      src={avatarSrc}
+                      alt="avatar"
+                      sx={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    />
+                  ) : (
+                    <PhotoPlaceholder />
+                  )}
+                </Box>
+
                 <Button
                   variant="outlined"
                   startIcon={<PhotoCameraOutlinedIcon />}
-                  sx={{
-                    mt: 2,
-                    textTransform: "none",
-                    borderRadius: 999,
-                    width: "fit-content",
-                  }}
-                  onClick={() => alert("Upload εικόνας (TODO)")}
+                  sx={{ mt: 2, textTransform: "none", borderRadius: 999, width: "fit-content" }}
+                  onClick={onPickPhoto}
                   disabled={!editMode}
                 >
                   Αλλαγή εικόνας
                 </Button>
+
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: "none" }}
+                  onChange={onPhotoSelected}
+                />
               </Box>
 
               {/* Right info rows */}
               <Box sx={{ flex: 1 }}>
-                {fields.map((f) => (
-                  <Row
-                    key={f.key}
-                    label={f.label}
-                    value={
-                      f.key === "experienceYears" && (draft?.[f.key] ?? "") !== ""
-                        ? String(draft?.[f.key])
-                        : draft?.[f.key]
-                    }
-                    isEditing={editMode}
-                    isActive={activeField === f.key}
-                    onStartEdit={() => startEditField(f.key)}
-                    onCancel={cancelEditField}
-                    onSave={saveEditFieldToDraft}
-                    inputValue={activeValue}
-                    setInputValue={setActiveValue}
-                    type={f.type || "text"}
-                    options={f.options || null}
-                  />
-                ))}
+                {fields.map((f) => {
+                  const shownValue =
+                    f.key === "experienceYears" && (draft?.[f.key] ?? "") !== ""
+                      ? String(draft?.[f.key])
+                      : draft?.[f.key];
+
+                  const errToShow =
+                    activeField === f.key
+                      ? (errors?.[f.key] || activeErrorLive) // δείξε live error
+                      : "";
+
+                  return (
+                    <Row
+                      key={f.key}
+                      label={f.label}
+                      value={shownValue}
+                      isEditing={editMode}
+                      isActive={activeField === f.key}
+                      onStartEdit={() => startEditField(f.key)}
+                      onCancel={cancelEditField}
+                      onSave={saveEditFieldToDraft}
+                      inputValue={activeValue}
+                      setInputValue={setActiveValue}
+                      type={f.type || "text"}
+                      options={f.options || null}
+                      errorText={errToShow}
+                      saveDisabled={activeField === f.key ? saveDisabled : false}
+                    />
+                  );
+                })}
 
                 {editMode && (
                   <Box sx={{ pt: 2 }}>
                     <Stack direction="row" justifyContent="center" spacing={2}>
                       <Button
-  variant="outlined"
-  color="error"
-  onClick={cancelWholeEdit}
-  sx={{
-    textTransform: "none",
-    borderRadius: 999,
-    px: 4,
-    borderColor: "error.main",
-    color: "error.main",
-    "&:hover": {
-      borderColor: "error.dark",
-      backgroundColor: "rgba(211, 47, 47, 0.08)", // προαιρετικό
-    },
-  }}
-  disabled={!!activeField}
->
-  Ακύρωση
-</Button>
-
+                        variant="outlined"
+                        color="error"
+                        onClick={cancelWholeEdit}
+                        sx={{ textTransform: "none", borderRadius: 999, px: 4 }}
+                        disabled={!!activeField}
+                      >
+                        Ακύρωση
+                      </Button>
 
                       <Button
                         variant="contained"
                         onClick={finishEdit}
-                        sx={{
-                          textTransform: "none",
-                          borderRadius: 999,
-                          px: 4,
-                          fontWeight: 900,
-                        }}
+                        color="success"
+                        sx={{ textTransform: "none", borderRadius: 999, px: 4, fontWeight: 900 }}
                         disabled={!!activeField}
                       >
                         Ολοκλήρωση επεξεργασίας

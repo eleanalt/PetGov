@@ -14,9 +14,11 @@ import {
   Stepper,
   TextField,
   Typography,
+  Breadcrumbs,
+  Link as MUILink,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
 import { api } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 
@@ -27,7 +29,7 @@ function onlyDigits(s) {
 }
 
 function isAdoptionOrFoster(lifeEvent) {
-  return lifeEvent === "Υιοθεσία" || lifeEvent === "Αναδοχή";
+  return lifeEvent === "Υιοθεσία" || lifeEvent === "Αναδοχή" || lifeEvent === "Μεταβίβαση";
 }
 
 async function findOwnerByAfm(afm) {
@@ -57,7 +59,6 @@ export default function VetRegistrationWizard() {
   const [saving, setSaving] = useState(false);
 
   const [pageMsg, setPageMsg] = useState(null);
-  // success screen after final submit
   const [submitted, setSubmitted] = useState(false);
 
   const [form, setForm] = useState({
@@ -67,8 +68,12 @@ export default function VetRegistrationWizard() {
     name: "",
     birthDate: "",
     lifeEvent: "",
-    ownerAfm: "", 
+    ownerAfm: "",
   });
+
+  // ✅ microchip auto-fill
+  const [petLookupLoading, setPetLookupLoading] = useState(false);
+  const [autoFilled, setAutoFilled] = useState(false);
 
   const showMsg = (type, text) => setPageMsg({ type, text });
   const clearMsg = () => setPageMsg(null);
@@ -90,7 +95,6 @@ export default function VetRegistrationWizard() {
             ownerAfm: res.data.ownerAfm ?? "",
           });
 
-          // αν είναι submitted -> step 2, αλλιώς στο preview (step 1)
           setStep(res.data.status === "submitted" ? 2 : 1);
         }
       } catch (e) {
@@ -105,6 +109,51 @@ export default function VetRegistrationWizard() {
     clearMsg();
     setForm((f) => ({ ...f, [key]: e.target.value }));
   };
+
+  // ✅ Auto-fill από /pets όταν υπάρχει microchip
+  useEffect(() => {
+    let cancelled = false;
+
+    const run = async () => {
+      if (regId) return;
+
+      const mc = onlyDigits(form.microchip);
+
+      if (!mc || mc.length < 4) {
+        setAutoFilled(false);
+        return;
+      }
+
+      setPetLookupLoading(true);
+      try {
+        const pet = await findPetByMicrochip(mc);
+        if (cancelled) return;
+
+        if (pet?.id) {
+          setForm((f) => ({
+            ...f,
+            microchip: mc,
+            species: pet.species ?? f.species ?? "",
+            sex: pet.sex ?? pet.gender ?? f.sex ?? "",
+            name: pet.name ?? f.name ?? "",
+            birthDate: pet.birthDate ?? f.birthDate ?? "",
+          }));
+          setAutoFilled(true);
+        } else {
+          setAutoFilled(false);
+        }
+      } catch (e) {
+        if (!cancelled) setAutoFilled(false);
+      } finally {
+        if (!cancelled) setPetLookupLoading(false);
+      }
+    };
+
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [form.microchip, regId]);
 
   const isValid = useMemo(() => {
     if (!onlyDigits(form.microchip)) return false;
@@ -144,7 +193,7 @@ export default function VetRegistrationWizard() {
       return false;
     }
     if (isAdoptionOrFoster(form.lifeEvent) && !onlyDigits(form.ownerAfm)) {
-      showMsg("error", "Για Υιοθεσία/Αναδοχή το ΑΦΜ ιδιοκτήτη είναι υποχρεωτικό.");
+      showMsg("error", "Για Υιοθεσία/Αναδοχή/Μεταβίβαση το ΑΦΜ ιδιοκτήτη είναι υποχρεωτικό.");
       return false;
     }
     if (!user?.id) {
@@ -174,7 +223,7 @@ export default function VetRegistrationWizard() {
         ...form,
         microchip: onlyDigits(form.microchip),
         ownerAfm: isAdoptionOrFoster(form.lifeEvent) ? onlyDigits(form.ownerAfm) : "",
-        ownerId: owner?.id ? String(owner.id) : "", 
+        ownerId: owner?.id ? String(owner.id) : "",
         vetUserId: String(user.id),
         status: "draft",
         updatedAt: new Date().toISOString(),
@@ -229,7 +278,6 @@ export default function VetRegistrationWizard() {
         updatedAt: new Date().toISOString(),
       };
 
-      // 1) submit registration
       if (regId) {
         await api.patch(`/petRegistrations/${regId}`, payload);
       } else {
@@ -241,7 +289,6 @@ export default function VetRegistrationWizard() {
         if (newId) navigate(`/vet/registrations/${newId}`, { replace: true });
       }
 
-      // 2) αν Υιοθεσία/Αναδοχή -> πέρασε το ζώο στα κατοικίδια του ιδιοκτήτη
       if (isAdoptionOrFoster(form.lifeEvent) && owner?.id) {
         const microchip = onlyDigits(form.microchip);
         const existingPet = await findPetByMicrochip(microchip);
@@ -252,8 +299,8 @@ export default function VetRegistrationWizard() {
             microchip,
             name: form.name || existingPet.name || "",
             species: form.species || existingPet.species || "",
-            sex: form.sex || existingPet.sex || existingPet.gender || "", 
-            gender: form.sex || existingPet.gender || existingPet.sex || "", 
+            sex: form.sex || existingPet.sex || existingPet.gender || "",
+            gender: form.sex || existingPet.gender || existingPet.sex || "",
             birthDate: form.birthDate || existingPet.birthDate || "",
             updatedAt: new Date().toISOString(),
           });
@@ -281,6 +328,11 @@ export default function VetRegistrationWizard() {
       setSaving(false);
     }
   };
+
+  const needsAfm = isAdoptionOrFoster(form.lifeEvent);
+
+  const pageTitle = regId ? "Επεξεργασία καταγραφής" : "Νέα καταγραφή";
+
 
   // Success screen after submit
   if (submitted) {
@@ -338,11 +390,10 @@ export default function VetRegistrationWizard() {
     );
   }
 
-  const needsAfm = isAdoptionOrFoster(form.lifeEvent);
-
   return (
     <Box sx={{ bgcolor: "grey.100", minHeight: "calc(100vh - 76px)", py: 4 }}>
       <Container maxWidth="lg">
+
         <Button
           startIcon={<ArrowBackIcon />}
           onClick={() => navigate("/vet/registrations")}
@@ -354,7 +405,7 @@ export default function VetRegistrationWizard() {
         <Card variant="outlined" sx={{ borderRadius: 3 }}>
           <CardContent sx={{ p: { xs: 2.5, md: 4 } }}>
             <Typography variant="h4" fontWeight={900} sx={{ mb: 2 }}>
-              Νέα καταγραφή
+              {pageTitle}
             </Typography>
 
             {pageMsg && (
@@ -378,8 +429,19 @@ export default function VetRegistrationWizard() {
                   <TextField
                     label="* Αριθμός Microchip"
                     value={form.microchip}
-                    onChange={setField("microchip")}
+                    onChange={(e) => {
+                      clearMsg();
+                      setAutoFilled(false);
+                      setForm((f) => ({ ...f, microchip: e.target.value }));
+                    }}
                     fullWidth
+                    helperText={
+                      petLookupLoading
+                        ? "Αναζήτηση μικροτσίπ..."
+                        : autoFilled
+                        ? "Βρέθηκε κατοικίδιο — συμπληρώθηκαν αυτόματα τα στοιχεία."
+                        : " "
+                    }
                   />
 
                   <TextField
@@ -388,6 +450,7 @@ export default function VetRegistrationWizard() {
                     value={form.species}
                     onChange={setField("species")}
                     fullWidth
+                    disabled={autoFilled}
                   >
                     <MenuItem value="Σκύλος">Σκύλος</MenuItem>
                     <MenuItem value="Γάτα">Γάτα</MenuItem>
@@ -400,12 +463,19 @@ export default function VetRegistrationWizard() {
                     value={form.sex}
                     onChange={setField("sex")}
                     fullWidth
+                    disabled={autoFilled}
                   >
                     <MenuItem value="Αρσενικό">Αρσενικό</MenuItem>
                     <MenuItem value="Θηλυκό">Θηλυκό</MenuItem>
                   </TextField>
 
-                  <TextField label="Όνομα" value={form.name} onChange={setField("name")} fullWidth />
+                  <TextField
+                    label="Όνομα"
+                    value={form.name}
+                    onChange={setField("name")}
+                    fullWidth
+                    disabled={autoFilled}
+                  />
 
                   <TextField
                     label="Ημερομηνία Γέννησης"
@@ -414,7 +484,18 @@ export default function VetRegistrationWizard() {
                     onChange={setField("birthDate")}
                     fullWidth
                     InputLabelProps={{ shrink: true }}
+                    disabled={autoFilled}
                   />
+
+                  {autoFilled && (
+                    <Button
+                      variant="text"
+                      onClick={() => setAutoFilled(false)}
+                      sx={{ textTransform: "none", alignSelf: "flex-start" }}
+                    >
+                      Επεξεργασία στοιχείων
+                    </Button>
+                  )}
 
                   <TextField
                     select
@@ -430,14 +511,13 @@ export default function VetRegistrationWizard() {
                     <MenuItem value="Αναδοχή">Αναδοχή</MenuItem>
                   </TextField>
 
-                  {/* ✅ ΑΦΜ ιδιοκτήτη μόνο για Υιοθεσία/Αναδοχή */}
                   {needsAfm && (
                     <TextField
                       label="* ΑΦΜ Ιδιοκτήτη"
                       value={form.ownerAfm}
                       onChange={setField("ownerAfm")}
                       fullWidth
-                      helperText="Απαιτείται για Υιοθεσία/Αναδοχή"
+                      helperText="Απαιτείται για Υιοθεσία/Αναδοχή/Μεταβίβαση"
                     />
                   )}
 
@@ -504,6 +584,7 @@ export default function VetRegistrationWizard() {
 
                         <Button
                           variant="outlined"
+                          color="success"
                           onClick={() => {
                             clearMsg();
                             setStep(2);
@@ -528,7 +609,7 @@ export default function VetRegistrationWizard() {
               </Box>
             )}
 
-            {/* STEP 3: Final submit + show details */}
+            {/* STEP 3 */}
             {step === 2 && (
               <Box sx={{ maxWidth: 640, mx: "auto" }}>
                 <Card variant="outlined" sx={{ borderRadius: 2 }}>
@@ -573,6 +654,7 @@ export default function VetRegistrationWizard() {
                       <Button
                         variant="contained"
                         onClick={submitFinal}
+                        color="success"
                         sx={{ textTransform: "none", borderRadius: 2, px: 4, fontWeight: 900 }}
                         disabled={saving}
                       >

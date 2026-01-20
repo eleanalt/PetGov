@@ -21,16 +21,15 @@ import { useAuth } from "../../auth/AuthContext";
 import VetBreadcrumbs from "../../components/OwnerBreadcrumbs";
 
 const STATUS_META = {
-  pending: { label: "Εκκρεμές", color: "default" },
+  pending: { label: "Εκκρεμές", color: "warning" },
   confirmed: { label: "Επιβεβαιωμένο", color: "success" },
-  cancelled: { label: "Ακυρωμένο", color: "default" },
-  rejected: { label: "Απορρίφθηκε", color: "default" },
+  cancelled: { label: "Ακυρωμένο", color: "error" },
+  rejected: { label: "Απορρίφθηκε", color: "error" },
   completed: { label: "Πραγματοποιήθηκε", color: "info" },
 };
 
 function fmtDate(dateStr) {
   if (!dateStr) return "—";
-
   const [y, m, d] = String(dateStr).split("-");
   if (!y || !m || !d) return dateStr;
   return `${d}/${m}/${y}`;
@@ -53,6 +52,29 @@ function fmtApptWhen(a) {
   return "—";
 }
 
+// ✅ Date object από appointment
+function getApptDateObj(a) {
+  if (!a) return null;
+
+  if (a.datetime) {
+    const dt = new Date(a.datetime);
+    return isNaN(dt.getTime()) ? null : dt;
+  }
+
+  if (a.date && a.time) {
+    const dt = new Date(`${a.date}T${a.time}:00`);
+    return isNaN(dt.getTime()) ? null : dt;
+  }
+
+  // Αν έχει μόνο date -> τέλος ημέρας
+  if (a.date) {
+    const dt = new Date(`${a.date}T23:59:59`);
+    return isNaN(dt.getTime()) ? null : dt;
+  }
+
+  return null;
+}
+
 export default function OwnerAppointments() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -65,22 +87,86 @@ export default function OwnerAppointments() {
   const load = async () => {
     if (!user?.id) return;
     setLoading(true);
+
     try {
       const [aRes, vRes, pRes] = await Promise.all([
-  api.get("/appointments", {
-    params: { ownerId: String(user.id), _sort: "updatedAt", _order: "desc" },
-  }),
-  api.get("/users", { params: { role: "vet" } }),
-  api.get("/pets", { params: { ownerId: String(user.id) } }),
-]);
+        api.get("/appointments", {
+          params: { ownerId: String(user.id), _sort: "updatedAt", _order: "desc" },
+        }),
+        api.get("/users", { params: { role: "vet" } }),
+        api.get("/pets", { params: { ownerId: String(user.id) } }),
+      ]);
 
-const vets = Array.isArray(vRes.data) ? vRes.data : [];
-setVetsById(Object.fromEntries(vets.map((v) => [String(v.id), v])));
+      const vets = Array.isArray(vRes.data) ? vRes.data : [];
       const pets = Array.isArray(pRes.data) ? pRes.data : [];
+      const appts = Array.isArray(aRes.data) ? aRes.data : [];
+
       setVetsById(Object.fromEntries(vets.map((v) => [String(v.id), v])));
       setPetsById(Object.fromEntries(pets.map((p) => [String(p.id), p])));
 
-      setAppointments(Array.isArray(aRes.data) ? aRes.data : []);
+      // ✅ AUTO STATUS UPDATE με βάση την ώρα:
+      // pending που πέρασε -> cancelled
+      // confirmed που πέρασε -> completed
+      const now = new Date();
+      const nowIso = new Date().toISOString();
+
+      const toCancel = appts.filter((a) => {
+        if (a?.status !== "pending") return false;
+        const dt = getApptDateObj(a);
+        if (!dt) return false;
+        return dt.getTime() < now.getTime();
+      });
+
+      const toComplete = appts.filter((a) => {
+        if (a?.status !== "confirmed") return false;
+        const dt = getApptDateObj(a);
+        if (!dt) return false;
+        return dt.getTime() < now.getTime();
+      });
+
+      if (toCancel.length || toComplete.length) {
+        await Promise.all([
+          ...toCancel.map((a) =>
+            api.patch(`/appointments/${a.id}`, {
+              status: "cancelled",
+              cancelledAt: nowIso,
+              cancelledBy: "system",
+              updatedAt: nowIso,
+            })
+          ),
+          ...toComplete.map((a) =>
+            api.patch(`/appointments/${a.id}`, {
+              status: "completed",
+              completedAt: nowIso,
+              updatedAt: nowIso,
+            })
+          ),
+        ]);
+
+        const cancelIds = new Set(toCancel.map((x) => String(x.id)));
+        const completeIds = new Set(toComplete.map((x) => String(x.id)));
+
+        const patched = appts.map((a) => {
+          const id = String(a.id);
+          if (cancelIds.has(id)) {
+            return {
+              ...a,
+              status: "cancelled",
+              cancelledAt: nowIso,
+              cancelledBy: "system",
+              updatedAt: nowIso,
+            };
+          }
+          if (completeIds.has(id)) {
+            return { ...a, status: "completed", completedAt: nowIso, updatedAt: nowIso };
+          }
+          return a;
+        });
+
+        setAppointments(patched);
+      } else {
+        setAppointments(appts);
+      }
     } catch (e) {
       console.error(e);
       setAppointments([]);
@@ -93,6 +179,7 @@ setVetsById(Object.fromEntries(vets.map((v) => [String(v.id), v])));
 
   useEffect(() => {
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
   const canCancel = (a) => a?.status === "pending" || a?.status === "confirmed";
@@ -138,7 +225,7 @@ setVetsById(Object.fromEntries(vets.map((v) => [String(v.id), v])));
           <Button
             variant="contained"
             onClick={() => navigate("/owner/appointments/new")}
-            sx={{ textTransform: "none", borderRadius: 2, bgcolor: "grey.700" }}
+            sx={{ textTransform: "none", borderRadius: 2 }}
           >
             Νέο Ραντεβού
           </Button>
@@ -155,24 +242,42 @@ setVetsById(Object.fromEntries(vets.map((v) => [String(v.id), v])));
               <Table>
                 <TableHead>
                   <TableRow>
-                    <TableCell><b>Ημερομηνία</b></TableCell>
-                    <TableCell><b>Υπηρεσία</b></TableCell>
-                    <TableCell><b>Κατοικίδιο</b></TableCell>
-                    <TableCell><b>Κτηνίατρος</b></TableCell>
-                    <TableCell><b>Κατάσταση</b></TableCell>
-                    <TableCell><b>Ενέργειες</b></TableCell>
+                    <TableCell>
+                      <b>Ημερομηνία</b>
+                    </TableCell>
+                    <TableCell>
+                      <b>Υπηρεσία</b>
+                    </TableCell>
+                    <TableCell>
+                      <b>Κατοικίδιο</b>
+                    </TableCell>
+                    <TableCell>
+                      <b>Κτηνίατρος</b>
+                    </TableCell>
+                    <TableCell>
+                      <b>Κατάσταση</b>
+                    </TableCell>
+                    <TableCell>
+                      <b>Ενέργειες</b>
+                    </TableCell>
                   </TableRow>
                 </TableHead>
+
                 <TableBody>
                   {loading ? (
-                    <TableRow><TableCell colSpan={6}>Φόρτωση...</TableCell></TableRow>
+                    <TableRow>
+                      <TableCell colSpan={6}>Φόρτωση...</TableCell>
+                    </TableRow>
                   ) : grouped.upcoming.length === 0 ? (
-                    <TableRow><TableCell colSpan={6}>Δεν υπάρχουν ενεργά ραντεβού.</TableCell></TableRow>
+                    <TableRow>
+                      <TableCell colSpan={6}>Δεν υπάρχουν ενεργά ραντεβού.</TableCell>
+                    </TableRow>
                   ) : (
                     grouped.upcoming.map((a) => {
                       const st = STATUS_META[a.status] || STATUS_META.pending;
                       const vet = vetsById[String(a.vetId)];
                       const pet = petsById[String(a.petId)];
+
                       return (
                         <TableRow key={a.id}>
                           <TableCell>{fmtApptWhen(a)}</TableCell>
@@ -191,6 +296,7 @@ setVetsById(Object.fromEntries(vets.map((v) => [String(v.id), v])));
                               >
                                 Προβολή
                               </Button>
+
                               <Button
                                 disabled={!canCancel(a)}
                                 onClick={() => cancelAppointment(a)}
@@ -221,24 +327,42 @@ setVetsById(Object.fromEntries(vets.map((v) => [String(v.id), v])));
               <Table>
                 <TableHead>
                   <TableRow>
-                    <TableCell><b>Ημερομηνία</b></TableCell>
-                    <TableCell><b>Υπηρεσία</b></TableCell>
-                    <TableCell><b>Κατοικίδιο</b></TableCell>
-                    <TableCell><b>Κτηνίατρος</b></TableCell>
-                    <TableCell><b>Κατάσταση</b></TableCell>
-                    <TableCell><b>Ενέργειες</b></TableCell>
+                    <TableCell>
+                      <b>Ημερομηνία</b>
+                    </TableCell>
+                    <TableCell>
+                      <b>Υπηρεσία</b>
+                    </TableCell>
+                    <TableCell>
+                      <b>Κατοικίδιο</b>
+                    </TableCell>
+                    <TableCell>
+                      <b>Κτηνίατρος</b>
+                    </TableCell>
+                    <TableCell>
+                      <b>Κατάσταση</b>
+                    </TableCell>
+                    <TableCell>
+                      <b>Ενέργειες</b>
+                    </TableCell>
                   </TableRow>
                 </TableHead>
+
                 <TableBody>
                   {loading ? (
-                    <TableRow><TableCell colSpan={6}>Φόρτωση...</TableCell></TableRow>
+                    <TableRow>
+                      <TableCell colSpan={6}>Φόρτωση...</TableCell>
+                    </TableRow>
                   ) : grouped.history.length === 0 ? (
-                    <TableRow><TableCell colSpan={6}>Δεν υπάρχει ιστορικό.</TableCell></TableRow>
+                    <TableRow>
+                      <TableCell colSpan={6}>Δεν υπάρχει ιστορικό.</TableCell>
+                    </TableRow>
                   ) : (
                     grouped.history.map((a) => {
                       const st = STATUS_META[a.status] || STATUS_META.pending;
                       const vet = vetsById[String(a.vetId)];
                       const pet = petsById[String(a.petId)];
+
                       return (
                         <TableRow key={a.id}>
                           <TableCell>{fmtApptWhen(a)}</TableCell>
@@ -256,6 +380,7 @@ setVetsById(Object.fromEntries(vets.map((v) => [String(v.id), v])));
                               >
                                 Προβολή
                               </Button>
+
                               <Button
                                 disabled={!canReview(a)}
                                 onClick={() => navigate(`/owner/appointments/review/${a.id}`)}

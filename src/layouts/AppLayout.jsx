@@ -21,6 +21,7 @@ import {
   ROLE_LABELS,
   isAllowed,
   effectiveRole,
+  HEADER_ACTIONS, // ✅ πρόσθεσε αυτό
 } from "../routes/menuConfig";
 
 export default function AppLayout() {
@@ -35,6 +36,7 @@ export default function AppLayout() {
   );
 
   const dropdownItems = USER_MENU[role] ?? [];
+  const headerAction = HEADER_ACTIONS?.[role] ?? null; // ✅ Dashboard button config
 
   const [anchorEl, setAnchorEl] = useState(null);
   const open = Boolean(anchorEl);
@@ -101,7 +103,7 @@ export default function AppLayout() {
             </Stack>
           </Box>
 
-          {/* Right: auth buttons / dropdown */}
+          {/* Right: auth buttons / dashboard + dropdown */}
           {!user ? (
             <Stack direction="row" spacing={1} alignItems="center">
               <Button
@@ -142,7 +144,28 @@ export default function AppLayout() {
               </Button>
             </Stack>
           ) : (
-            <>
+            <Stack direction="row" spacing={1} alignItems="center">
+              {/* ✅ Dashboard button ΔΙΠΛΑ απο το dropdown */}
+              {headerAction && (
+                <Button
+                  variant="contained"
+                  onClick={() => navigate(headerAction.to)}
+                  sx={{
+                    textTransform: "none",
+                    px: 2,
+                    py: 1,
+                    borderRadius: 2,
+                    bgcolor: "rgba(255,255,255,0.92)",
+                    color: "text.primary",
+                    fontWeight: 900,
+                    "&:hover": { bgcolor: "rgba(255,255,255,1)" },
+                  }}
+                >
+                  {headerAction.label}
+                </Button>
+              )}
+
+              {/* Dropdown trigger */}
               <Button
                 color="inherit"
                 onClick={handleOpen}
@@ -160,7 +183,8 @@ export default function AppLayout() {
                   py: 1,
                 }}
               >
-                {ROLE_LABELS[role] ?? role}
+                {/* ✅ δείχνει ΟΝΟΜΑΤΕΠΩΝΥΜΟ δίπλα, όχι μόνο ρόλο */}
+                {user.fullName}
               </Button>
 
               <Menu
@@ -179,6 +203,7 @@ export default function AppLayout() {
 
                 <Divider />
 
+                {/* ✅ Dropdown items ΧΩΡΙΣ Dashboard */}
                 {dropdownItems.map((it) => (
                   <MenuItem key={it.to} onClick={() => go(it.to)}>
                     {it.label}
@@ -191,7 +216,7 @@ export default function AppLayout() {
                   Αποσύνδεση
                 </MenuItem>
               </Menu>
-            </>
+            </Stack>
           )}
         </Toolbar>
       </AppBar>
@@ -201,7 +226,6 @@ export default function AppLayout() {
         <Outlet />
       </Box>
 
-      {/* footer σε ΟΛΕΣ τις σελίδες */}
       <SiteFooter />
     </Box>
   );

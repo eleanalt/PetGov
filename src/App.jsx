@@ -15,7 +15,7 @@ import OwnerPets from "./pages/owner/OwnerPets";
 import OwnerAppointments from "./pages/owner/OwnerAppointments";
 import OwnerLost from "./pages/owner/OwnerLost";
 import OwnerHealthBook from "./pages/owner/OwnerHealthBook";
-import OwnerGuide from "./pages/owner/OwnerGuide";
+import OwnerDashboard from "./pages/owner/OwnerDashboard";
 import OwnerLostHistory from "./pages/owner/OwnerLostHistory";
 import OwnerLostWizard from "./pages/owner/OwnerLostWizard";
 import OwnerFoundMine from "./pages/owner/OwnerFoundMine";
@@ -27,12 +27,14 @@ import OwnerReview from "./pages/owner/OwnerReview";
 import OwnerProfile from "./pages/owner/OwnerProfile";
 import OwnerLayout from "./layouts/OwnerLayout";
 import OwnerMyFoundReports from "./pages/owner/OwnerMyFoundReports";
+import OwnerFoundReportDetails from "./pages/owner/OwnerFoundReportDetails";
 
+import VetLayout from "./layouts/VetLayout";
 import VetActs from "./pages/vet/VetActs";
 import VetActNew from "./pages/vet/VetActNew";
 import VetActsHistory from "./pages/vet/VetActsHistory";
 import VetHealthBook from "./pages/vet/VetHealthBook";
-import VetGuide from "./pages/vet/VetGuide";
+import VetDashboard from "./pages/vet/VetDashboard";
 import VetProfile from "./pages/vet/VetProfile";
 import VetRegistrations from "./pages/vet/VetRegistrations";
 import VetRegistrationWizard from "./pages/vet/VetRegistrationWizard";
@@ -69,12 +71,12 @@ export default function App() {
 <Route element={<RequireAuth allowedRoles={["owner"]} />}>
   <Route path="/owner" element={<OwnerLayout />}>
     {/* default owner page */}
-    <Route path="/owner" element={<OwnerGuide />} />
+    <Route path="/owner" element={<OwnerDashboard />} />
           <Route path="/owner/pets" element={<OwnerPets />} />
           <Route path="/owner/appointments" element={<OwnerAppointments />} />
           <Route path="/owner/lost" element={<OwnerLost />} />
           <Route path="/owner/healthbook/:petId" element={<OwnerHealthBook />} />
-          <Route path="/owner/guide" element={<OwnerGuide />} />
+          <Route path="/owner/dashboard" element={<OwnerDashboard />} />
           <Route path="/owner/found/:id" element={<OwnerFoundView />} />
           <Route path="/owner/found/view" element={<OwnerFoundView />} /> 
           <Route path="/owner/pets/:petId/healthbook" element={<OwnerHealthBook />} />
@@ -86,7 +88,7 @@ export default function App() {
           <Route path="/owner/appointments/new" element={<OwnerAppointmentWizard />} />
           <Route path="/owner/appointments/new/:vetId" element={<OwnerAppointmentWizard />} />
           <Route path="/owner/profile" element={<OwnerProfile />} />
-        
+          <Route path="/owner/found-reports/:id" element={<OwnerFoundReportDetails />} />
          <Route path="/owner/found-reports" element={<OwnerMyFoundReports />} />
 
 
@@ -100,8 +102,8 @@ export default function App() {
 
         {/* Vet protected */}
         <Route element={<RequireAuth allowedRoles={["vet"]} />}>
-        <Route path="/owner" element={<OwnerLayout />}></Route>
-          <Route path="/vet" element={<VetGuide />} />
+        <Route path="/vet" element={<VetLayout />}>
+          <Route path="/vet" element={<VetDashboard />} />
           <Route path="/vet/profile" element={<VetProfile />} />
 
           <Route path="/vet/registrations" element={<VetRegistrations />} />
@@ -125,6 +127,7 @@ export default function App() {
         </Route>
 
         <Route path="*" element={<NotFound />} />
+      </Route>
       </Route>
     </Routes>
   );

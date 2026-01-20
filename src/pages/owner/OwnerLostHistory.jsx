@@ -23,9 +23,9 @@ import { useAuth } from "../../auth/AuthContext";
 
 const STATUS_LABEL = {
   draft: { label: "Πρόχειρη", color: "default" },
-  submitted: { label: "ΑΝΟΙΧΤΗ", color: "success" },
+  submitted: { label: "ΑΝΟΙΧΤΗ", color: "warning" },
   found: { label: "ΒΡΕΘΗΚΕ", color: "success" },
-  cancelled: { label: "Ακυρωμένη", color: "default" },
+  cancelled: { label: "Ακυρωμένη", color: "error" },
 };
 
 export default function OwnerLostHistory() {

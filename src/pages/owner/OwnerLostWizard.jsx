@@ -357,6 +357,7 @@ export default function OwnerLostWizard() {
 
                   <Button
                     variant="contained"
+                    color="success"
                     onClick={() => goStep(1)}
                     disabled={!isStep1Valid || finalized}
                     sx={{ textTransform: "none", borderRadius: 2, fontWeight: 900 }}
@@ -412,6 +413,7 @@ export default function OwnerLostWizard() {
                     <Button
                       variant="contained"
                       onClick={() => goStep(2)}
+                      color="success"
                       disabled={!isStep2Valid || finalized}
                       sx={{ textTransform: "none", borderRadius: 2, fontWeight: 900 }}
                     >
@@ -457,7 +459,7 @@ export default function OwnerLostWizard() {
                         textTransform: "none",
                         borderRadius: 2,
                         fontWeight: 900,
-                        bgcolor: "grey.700",
+                        bgcolor: "primary",
                       }}
                     >
                       Προσωρινή Αποθήκευση
@@ -466,10 +468,11 @@ export default function OwnerLostWizard() {
                     <Button
                       variant="outlined"
                       onClick={() => goStep(3)}
+                      color="success"
                       sx={{ textTransform: "none", borderRadius: 2 }}
                       disabled={saving || finalized}
                     >
-                      Επόμενο
+                      Συνέχεια
                     </Button>
                   </Stack>
                 </Stack>
@@ -539,8 +542,9 @@ export default function OwnerLostWizard() {
                     <Button
                       variant="contained"
                       onClick={submitFinal}
+                      color="success"
                       disabled={saving}
-                      sx={{ textTransform: "none", borderRadius: 2, fontWeight: 900, bgcolor: "grey.700" }}
+                      sx={{ textTransform: "none", borderRadius: 2, fontWeight: 900 }}
                     >
                       Οριστική Υποβολή
                     </Button>

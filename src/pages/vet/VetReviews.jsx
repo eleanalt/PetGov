@@ -1,9 +1,22 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Box, Card, CardContent, Container, Stack, Typography, Rating, Divider } from "@mui/material";
+import {
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Container,
+  Stack,
+  Typography,
+  Rating,
+  Divider,
+} from "@mui/material";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import { useNavigate } from "react-router-dom";
 import { api } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 
 export default function VetReviews() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [items, setItems] = useState([]);
 
@@ -23,6 +36,14 @@ export default function VetReviews() {
   return (
     <Box sx={{ bgcolor: "grey.100", minHeight: "calc(100vh - 76px)", py: 4 }}>
       <Container maxWidth="md">
+        <Button
+          startIcon={<ArrowBackIcon />}
+          onClick={() => navigate("/")}
+          sx={{ textTransform: "none", mb: 2 }}
+        >
+          Επιστροφή στην αρχική
+        </Button>
+
         <Stack spacing={2}>
           <Typography variant="h4" fontWeight={900}>
             Αξιολογήσεις

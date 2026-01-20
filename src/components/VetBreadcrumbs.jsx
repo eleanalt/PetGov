@@ -21,9 +21,10 @@ export default function VetBreadcrumbs() {
     crumbs.push({ label: "Ραντεβού", to: "/vet/appointments" });
   } else if (pathname.startsWith("/vet/acts")) {
     crumbs.push({ label: "Ιατρικές Πράξεις", to: "/vet/acts" });
+    } else if (pathname.startsWith("/vet/reviews")) {
+  crumbs.push({ label: "Αξιολογήσεις", to: "/vet/reviews" });
   } else {
-    // default για /vet (οδηγός)
-    crumbs.push({ label: "Οδηγός", to: "/vet" });
+    crumbs.push({ label: "Dashboard", to: "/vet" });
   }
 
   const lastIndex = crumbs.length - 1;

@@ -103,6 +103,7 @@ function Row({
   onSave,
   inputValue,
   setInputValue,
+  errorText,
   type = "text",
 }) {
   return (
@@ -119,13 +120,16 @@ function Row({
             {isActive ? (
               <Stack direction="row" alignItems="center" spacing={1}>
                 <TextField
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  size="small"
-                  fullWidth
-                  type={type}
-                  placeholder="—"
-                />
+  value={inputValue}
+  onChange={(e) => setInputValue(e.target.value)}
+  size="small"
+  fullWidth
+  type={type}
+  placeholder="—"
+  error={!!errorText}
+  helperText={errorText || " "}
+/>
+
                 <IconButton onClick={onSave} aria-label="save">
                   <CheckIcon />
                 </IconButton>
@@ -183,6 +187,7 @@ export default function VetProfile() {
   const [profile, setProfile] = useState(null);
   const [draft, setDraft] = useState(null);
   const [editMode, setEditMode] = useState(false);
+  const [errors, setErrors] = useState({});
 
   const [activeField, setActiveField] = useState(null);
   const [activeValue, setActiveValue] = useState("");
@@ -228,21 +233,47 @@ export default function VetProfile() {
   ];
 
   const startEditField = (key) => {
-    setActiveField(key);
-    setActiveValue(draft?.[key] ?? "");
-  };
+  setActiveField(key);
+  setActiveValue(draft?.[key] ?? "");
+  setErrors((e) => ({ ...e, [key]: "" }));
+};
+
 
   const cancelEditField = () => {
-    setActiveField(null);
-    setActiveValue("");
-  };
+  if (activeField) setErrors((e) => ({ ...e, [activeField]: "" }));
+  setActiveField(null);
+  setActiveValue("");
+};
+
 
   const saveEditFieldToDraft = () => {
-    if (!activeField) return;
-    setDraft((d) => ({ ...d, [activeField]: activeValue }));
-    setActiveField(null);
-    setActiveValue("");
-  };
+  if (!activeField) return;
+
+  const v = String(activeValue ?? "").trim();
+
+  // required validation (για όλα τα πεδία)
+  if (!v) {
+    setErrors((e) => ({ ...e, [activeField]: "Το πεδίο είναι υποχρεωτικό." }));
+    return; // ⛔ μην κλείνεις edit, μην κάνεις save
+  }
+
+  // (προαιρετικά) πιο ειδικοί έλεγχοι
+  if (activeField === "email" && !/^\S+@\S+\.\S+$/.test(v)) {
+    setErrors((e) => ({ ...e, [activeField]: "Μη έγκυρο email." }));
+    return;
+  }
+
+  if (activeField === "afm" && !/^\d{9}$/.test(v)) {
+    setErrors((e) => ({ ...e, [activeField]: "Το ΑΦΜ πρέπει να έχει 9 ψηφία." }));
+    return;
+  }
+
+  setDraft((d) => ({ ...d, [activeField]: v }));
+  setErrors((e) => ({ ...e, [activeField]: "" }));
+  setActiveField(null);
+  setActiveValue("");
+};
+
 
   const cancelWholeEdit = () => {
     setDraft(profile); // επαναφορά (μαζί και της εικόνας)
@@ -394,18 +425,20 @@ export default function VetProfile() {
               <Box sx={{ flex: 1 }}>
                 {fields.map((f) => (
                   <Row
-                    key={f.key}
-                    label={f.label}
-                    value={draft?.[f.key]}
-                    isEditing={editMode}
-                    isActive={activeField === f.key}
-                    onStartEdit={() => startEditField(f.key)}
-                    onCancel={cancelEditField}
-                    onSave={saveEditFieldToDraft}
-                    inputValue={activeValue}
-                    setInputValue={setActiveValue}
-                    type={f.type || "text"}
-                  />
+  key={f.key}
+  label={f.label}
+  value={draft?.[f.key]}
+  isEditing={editMode}
+  isActive={activeField === f.key}
+  onStartEdit={() => startEditField(f.key)}
+  onCancel={cancelEditField}
+  onSave={saveEditFieldToDraft}
+  inputValue={activeValue}
+  setInputValue={setActiveValue}
+  type={f.type || "text"}
+  errorText={errors?.[f.key]}
+/>
+
                 ))}
 
                 {editMode && (
@@ -413,6 +446,7 @@ export default function VetProfile() {
                     <Stack direction="row" justifyContent="center" spacing={2}>
                       <Button
                         variant="outlined"
+                        color="error"
                         onClick={cancelWholeEdit}
                         sx={{ textTransform: "none", borderRadius: 999, px: 4 }}
                         disabled={!!activeField}
@@ -422,6 +456,7 @@ export default function VetProfile() {
 
                       <Button
                         variant="contained"
+                        color="success"
                         onClick={finishEdit}
                         sx={{ textTransform: "none", borderRadius: 999, px: 4, fontWeight: 900 }}
                         disabled={!!activeField}

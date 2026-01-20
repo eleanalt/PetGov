@@ -95,18 +95,6 @@ export default function VetActDurations() {
     <Box sx={{ bgcolor: "grey.100", minHeight: "calc(100vh - 76px)", py: 4 }}>
       <Container maxWidth="lg">
         <Stack spacing={2}>
-          <Breadcrumbs sx={{ color: "text.secondary" }}>
-            <MLink component={RouterLink} to="/" underline="hover" color="inherit">
-              Αρχική
-            </MLink>
-            <MLink component={RouterLink} to="/vet/appointments" underline="hover" color="inherit">
-              Ραντεβού
-            </MLink>
-            <MLink component={RouterLink} to="/vet/availability" underline="hover" color="inherit">
-              Διαθεσιμότητα
-            </MLink>
-            <Typography color="text.primary">Διάρκειες Πράξεων</Typography>
-          </Breadcrumbs>
 
           <Button
             startIcon={<ArrowBackIcon />}

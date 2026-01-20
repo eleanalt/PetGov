@@ -132,15 +132,7 @@ export default function VetHealthBook() {
   return (
     <Box sx={{ bgcolor: "grey.100", minHeight: "calc(100vh - 76px)", py: 4 }}>
       <Container maxWidth="lg">
-        <Breadcrumbs aria-label="breadcrumb" sx={{ color: "text.secondary", mb: 2 }}>
-          <MLink component={RouterLink} to="/" underline="hover" color="inherit">
-            Αρχική
-          </MLink>
-          <MLink component={RouterLink} to="/vet/acts" underline="hover" color="inherit">
-            Ιατρικές Πράξεις
-          </MLink>
-          <Typography color="text.primary">Βιβλιάριο υγείας</Typography>
-        </Breadcrumbs>
+        
 
         <Button
           startIcon={<ArrowBackIcon />}

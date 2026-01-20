@@ -24,6 +24,19 @@ import CalendarMonthOutlinedIcon from "@mui/icons-material/CalendarMonthOutlined
 import { useNavigate } from "react-router-dom";
 import { api } from "../../api/client";
 
+const GREEK_CITIES_SAMPLE = [
+  "Αθήνα",
+  "Θεσσαλονίκη",
+  "Πάτρα",
+  "Ηράκλειο",
+  "Λάρισα",
+  "Βόλος",
+  "Ιωάννινα",
+  "Χανιά",
+  "Καβάλα",
+  "Ρόδος",
+];
+
 function PetPhoto({ src, alt }) {
   return (
     <Box
@@ -154,7 +167,7 @@ export default function LostPets() {
         .map((l) => l.area || l.lostArea)
         .filter(Boolean)
     );
-    return ["all", ...Array.from(set)];
+    return ["all", ...GREEK_CITIES_SAMPLE];
   }, [lostPets]);
 
   const filtered = useMemo(() => {

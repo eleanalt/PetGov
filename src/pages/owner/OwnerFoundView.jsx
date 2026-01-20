@@ -14,11 +14,22 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../../api/client";
 
+// ✅ 0544 -> 544
+function normId(x) {
+  const s = String(x ?? "");
+  const t = s.replace(/^0+/, "");
+  return t === "" ? "0" : t;
+}
+
+function unique(arr) {
+  return Array.from(new Set(arr.filter(Boolean).map(String)));
+}
+
 export default function OwnerFoundView() {
   const navigate = useNavigate();
   const { id } = useParams(); // /owner/found/:id
   const [params] = useSearchParams();
-  const lostIdFromQuery = params.get("lostId") || ""; // /owner/found/view?lostId=...
+  const lostIdFromQuery = params.get("lostId") || "";
 
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
@@ -31,6 +42,8 @@ export default function OwnerFoundView() {
   const isResolved = reportStatus === "confirmed" || reportStatus === "rejected";
 
   useEffect(() => {
+    let cancelled = false;
+
     (async () => {
       setMsg({ type: "", text: "" });
       setLoading(true);
@@ -41,52 +54,99 @@ export default function OwnerFoundView() {
         // A) /owner/found/:id
         if (id) {
           const r = await api.get(`/foundReports/${id}`);
-          fr = r.data || null;
+          fr = r?.data || null;
         }
         // B) /owner/found/view?lostId=...
         else if (lostIdFromQuery) {
-          const r = await api.get("/foundReports", { params: { lostPetId: String(lostIdFromQuery) } });
+          // ✅ Φέρε ΟΛΕΣ και φίλτραρε χειροκίνητα με normId για να πιάσει 544 vs 0544
+          const r = await api.get("/foundReports");
           const arr = Array.isArray(r.data) ? r.data : [];
 
-          // κράτα τα μη-rejected, και πάρε το πιο πρόσφατο
-          const filtered = arr.filter((x) => x.status !== "rejected");
+          const wanted = normId(lostIdFromQuery);
+          const filtered = arr
+            .filter((x) => normId(x?.lostPetId) === wanted)
+            .filter((x) => String(x?.status || "") !== "rejected");
+
           const sorted = [...filtered].sort((a, b) =>
-            String(b.createdAt || "").localeCompare(String(a.createdAt || ""))
+            String(b?.createdAt || b?.date || "").localeCompare(
+              String(a?.createdAt || a?.date || "")
+            )
           );
+
           fr = sorted[0] || null;
         } else {
-          setMsg({ type: "error", text: "Λείπει το id ή lostId από το URL." });
-          setReport(null);
-          setLost(null);
+          if (!cancelled) {
+            setMsg({ type: "error", text: "Λείπει το id ή lostId από το URL." });
+            setReport(null);
+            setLost(null);
+          }
           return;
         }
 
         if (!fr) {
-          setMsg({ type: "error", text: "Η δήλωση εύρεσης δεν βρέθηκε." });
-          setReport(null);
-          setLost(null);
+          if (!cancelled) {
+            setMsg({ type: "error", text: "Η δήλωση εύρεσης δεν βρέθηκε." });
+            setReport(null);
+            setLost(null);
+          }
           return;
         }
 
+        if (cancelled) return;
         setReport(fr);
 
-        // φόρτωσε lostPet
-        const lostId = fr.lostPetId || lostIdFromQuery;
-        if (lostId) {
-          const lp = await api.get(`/lostPets/${lostId}`);
-          setLost(lp.data || null);
-        } else {
-          setLost(null);
+        // ✅ φόρτωσε lostPet με fallback ids (544 / 0544 / padStart)
+        const rawLostId = fr.lostPetId || lostIdFromQuery;
+
+        if (!rawLostId) {
+          if (!cancelled) setLost(null);
+          return;
+        }
+
+        const candidates = unique([
+          String(rawLostId),
+          normId(rawLostId),
+          String(rawLostId).padStart(4, "0"),
+          String(rawLostId).padStart(3, "0"),
+        ]);
+
+        let loaded = null;
+        for (const lid of candidates) {
+          try {
+            const lp = await api.get(`/lostPets/${lid}`);
+            loaded = lp?.data || null;
+            if (loaded) break;
+          } catch {
+            // try next
+          }
+        }
+
+        if (!cancelled) {
+          setLost(loaded);
+          if (!loaded) {
+            // δεν κόβουμε τη σελίδα, απλά ενημερώνουμε
+            setMsg({
+              type: "error",
+              text:
+                "Βρέθηκε η αναφορά εύρεσης, αλλά δεν βρέθηκε η αντίστοιχη δήλωση απώλειας (lostPetId mismatch π.χ. 544 vs 0544).",
+            });
+          }
         }
       } catch (e) {
         console.error(e);
-        setMsg({ type: "error", text: "Αποτυχία φόρτωσης δήλωσης εύρεσης." });
-        setReport(null);
-        setLost(null);
+        if (!cancelled) {
+          setMsg({ type: "error", text: "Αποτυχία φόρτωσης δήλωσης εύρεσης." });
+          setReport(null);
+          setLost(null);
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [id, lostIdFromQuery]);
 
   const canAct = useMemo(() => {
@@ -105,6 +165,7 @@ export default function OwnerFoundView() {
       await api.patch(`/lostPets/${lost.id}`, {
         status: "found",
         foundAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       });
 
       await api.patch(`/foundReports/${report.id}`, {
@@ -114,7 +175,10 @@ export default function OwnerFoundView() {
 
       setLost((x) => ({ ...(x || {}), status: "found" }));
       setReport((x) => ({ ...(x || {}), status: "confirmed" }));
-      setMsg({ type: "success", text: "Επιβεβαιώθηκε η εύρεση. Η δήλωση απώλειας έγινε: ΒΡΕΘΗΚΕ." });
+      setMsg({
+        type: "success",
+        text: "Επιβεβαιώθηκε η εύρεση. Η δήλωση απώλειας έγινε: ΒΡΕΘΗΚΕ.",
+      });
     } catch (e) {
       console.error(e);
       setMsg({ type: "error", text: "Αποτυχία επιβεβαίωσης εύρεσης." });
@@ -180,7 +244,7 @@ export default function OwnerFoundView() {
 
                 <Preview label="Microchip" value={report.microchip || lost?.microchip || "—"} />
                 <Preview label="Όνομα" value={lost?.petName || lost?.name || "—"} />
-                <Preview label="Τοποθεσία απώλειας" value={lost?.lostArea || "—"} />
+                <Preview label="Τοποθεσία απώλειας" value={lost?.lostArea || lost?.area || "—"} />
                 <Preview label="Ημερομηνία απώλειας" value={lost?.lostDate || "—"} />
 
                 <Typography fontWeight={900} sx={{ mt: 3, mb: 1 }}>
@@ -228,7 +292,6 @@ export default function OwnerFoundView() {
                   </>
                 )}
 
-                {/* Κουμπιά κάτω όπως στο figma */}
                 <Stack direction="row" spacing={2} justifyContent="center" sx={{ mt: 4 }}>
                   <Button
                     variant="contained"

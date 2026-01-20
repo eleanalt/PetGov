@@ -49,13 +49,7 @@ export default function VetAvailability() {
     <Box sx={{ bgcolor: "grey.100", minHeight: "calc(100vh - 76px)", py: 4 }}>
       <Container maxWidth="md">
         <Stack spacing={2}>
-          <Breadcrumbs sx={{ color: "text.secondary" }}>
-            <MLink component={RouterLink} to="/" underline="hover" color="inherit">
-              Αρχική
-            </MLink>
-            <Typography color="text.primary">Ραντεβού</Typography>
-            <Typography color="text.primary">Διαθεσιμότητα</Typography>
-          </Breadcrumbs>
+          
 
           <Typography variant="h4" fontWeight={900} sx={{ textAlign: "center" }}>
             Τα διαθέσιμα Ραντεβού μου

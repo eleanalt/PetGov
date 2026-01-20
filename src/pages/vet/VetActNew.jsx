@@ -105,15 +105,7 @@ export default function VetActNew() {
     <Box sx={{ bgcolor: "grey.100", minHeight: "calc(100vh - 76px)", py: 4 }}>
       <Container maxWidth="lg">
         <Stack spacing={2}>
-          <Breadcrumbs aria-label="breadcrumb" sx={{ color: "text.secondary" }}>
-            <MLink component={RouterLink} to="/" underline="hover" color="inherit">
-              Αρχική
-            </MLink>
-            <MLink component={RouterLink} to="/vet/acts" underline="hover" color="inherit">
-              Ιατρικές Πράξεις
-            </MLink>
-            <Typography color="text.primary">Νέα Ιατρική Πράξη</Typography>
-          </Breadcrumbs>
+          
 
           <Button
             startIcon={<ArrowBackIcon />}
@@ -177,6 +169,7 @@ export default function VetActNew() {
                   <Stack direction="row" justifyContent="flex-end" spacing={2} sx={{ pt: 1 }}>
                     <Button
                       variant="outlined"
+                      color="error"
                       onClick={() => navigate(`/vet/acts/history/${pet.id}`)}
                       sx={{ textTransform: "none", borderRadius: 2, px: 4 }}
                       disabled={saving}
@@ -187,7 +180,8 @@ export default function VetActNew() {
                     <Button
                       variant="contained"
                       onClick={onSave}
-                      sx={{ textTransform: "none", borderRadius: 2, px: 5, fontWeight: 900, bgcolor: "grey.700" }}
+                      color="success"
+                      sx={{ textTransform: "none", borderRadius: 2, px: 5, fontWeight: 900}}
                       disabled={!canSave || saving}
                     >
                       Προσθήκη

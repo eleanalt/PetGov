@@ -46,6 +46,13 @@ function fmtDate(isoOrDate) {
   return `${dd}/${mm}/${yyyy}`;
 }
 
+// ✅ 0544 -> 544 (και 000 -> 0)
+function normId(x) {
+  const s = String(x ?? "");
+  const trimmed = s.replace(/^0+/, "");
+  return trimmed === "" ? "0" : trimmed;
+}
+
 export default function OwnerMyFoundReports() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -54,7 +61,7 @@ export default function OwnerMyFoundReports() {
   const [msg, setMsg] = useState({ type: "", text: "" });
 
   const [foundReports, setFoundReports] = useState([]);
-  const [pets, setPets] = useState([]);
+  const [lostPets, setLostPets] = useState([]);
 
   useEffect(() => {
     (async () => {
@@ -64,33 +71,69 @@ export default function OwnerMyFoundReports() {
       setMsg({ type: "", text: "" });
 
       try {
-        // ⬇️ άλλαξε το endpoint αν στο δικό σου backend λέγεται αλλιώς
-        const [rRes, pRes] = await Promise.all([
-          api.get("/foundReports", { params: { reporterId: String(user.id) } }),
-          api.get("/pets", { params: { ownerId: String(user.id) } }),
-        ]);
+        const [rRes, lRes] = await Promise.all([api.get("/foundReports"), api.get("/lostPets")]);
 
         setFoundReports(Array.isArray(rRes.data) ? rRes.data : []);
-        setPets(Array.isArray(pRes.data) ? pRes.data : []);
+        setLostPets(Array.isArray(lRes.data) ? lRes.data : []);
       } catch (e) {
         console.error(e);
         setMsg({ type: "error", text: "Αποτυχία φόρτωσης αναφορών εύρεσης." });
         setFoundReports([]);
+        setLostPets([]);
       } finally {
         setLoading(false);
       }
     })();
   }, [user?.id]);
 
-  const petById = useMemo(() => {
+  // ✅ Map για exact match
+  const lostPetById = useMemo(() => {
     const m = new Map();
-    (pets || []).forEach((p) => m.set(String(p.id), p));
+    lostPets.forEach((p) => m.set(String(p.id), p));
     return m;
-  }, [pets]);
+  }, [lostPets]);
+
+  // ✅ Map για match χωρίς leading zeros (π.χ. "0544" -> "544")
+  const lostPetByNormId = useMemo(() => {
+    const m = new Map();
+    lostPets.forEach((p) => m.set(normId(p.id), p));
+    return m;
+  }, [lostPets]);
+
+  // ✅ fallback: microchip -> lostPet
+  const lostPetByMicrochip = useMemo(() => {
+    const m = new Map();
+    lostPets.forEach((p) => {
+      if (p.microchip) m.set(String(p.microchip), p);
+    });
+    return m;
+  }, [lostPets]);
+
+  const findLostPetForReport = (r) => {
+    if (!r) return null;
+
+    // 1) exact id
+    if (r.lostPetId != null) {
+      const exact = lostPetById.get(String(r.lostPetId));
+      if (exact) return exact;
+
+      // 2) normalized id
+      const norm = lostPetByNormId.get(normId(r.lostPetId));
+      if (norm) return norm;
+    }
+
+    // 3) fallback by microchip
+    if (r.microchip) {
+      const byMc = lostPetByMicrochip.get(String(r.microchip));
+      if (byMc) return byMc;
+    }
+
+    return null;
+  };
 
   const sorted = useMemo(() => {
     return [...(foundReports || [])].sort((a, b) =>
-      String(b.createdAt || b.date || "").localeCompare(String(a.createdAt || a.date || ""))
+      String(b.date || b.createdAt || "").localeCompare(String(a.date || a.createdAt || ""))
     );
   }, [foundReports]);
 
@@ -111,12 +154,13 @@ export default function OwnerMyFoundReports() {
               <Typography variant="h5" fontWeight={900} sx={{ mb: 0.5 }}>
                 Οι Αναφορές Εύρεσης μου
               </Typography>
+
               <Typography color="text.secondary" sx={{ mb: 2 }}>
                 Εδώ βλέπεις τις αναφορές εύρεσης που έχεις υποβάλει εσύ για άλλα ζώα και την κατάστασή τους.
               </Typography>
 
               {msg.text && (
-                <Alert severity={msg.type === "error" ? "error" : "success"} sx={{ mb: 2 }}>
+                <Alert severity={msg.type} sx={{ mb: 2 }}>
                   {msg.text}
                 </Alert>
               )}
@@ -127,7 +171,7 @@ export default function OwnerMyFoundReports() {
                 <TableHead>
                   <TableRow>
                     <TableCell sx={{ fontWeight: 900 }}>Ημερομηνία</TableCell>
-                    <TableCell sx={{ fontWeight: 900 }}>Ζώο/Στοιχεία</TableCell>
+                    <TableCell sx={{ fontWeight: 900 }}>Ζώο</TableCell>
                     <TableCell sx={{ fontWeight: 900 }}>Τοποθεσία</TableCell>
                     <TableCell sx={{ fontWeight: 900 }}>Κατάσταση</TableCell>
                     <TableCell sx={{ fontWeight: 900 }} align="right">
@@ -145,24 +189,29 @@ export default function OwnerMyFoundReports() {
                     </TableRow>
                   ) : (
                     sorted.map((r) => {
-                      const pet = r.petId ? petById.get(String(r.petId)) : null;
+                      const lostPet = findLostPetForReport(r);
+
+                      const petName = lostPet?.petName || "—";
+                      const species = lostPet?.species || "—";
+                      const microchip = lostPet?.microchip || r.microchip || "—";
+
+                      const location =
+                        r.location || lostPet?.area || lostPet?.lostArea || "—";
 
                       return (
                         <TableRow key={r.id}>
-                          <TableCell>
-                            {fmtDate(r.createdAt || r.date)}
-                          </TableCell>
+                          <TableCell>{fmtDate(r.date || r.createdAt)}</TableCell>
 
                           <TableCell>
                             <Typography fontWeight={800}>
-                              {pet?.name ? `${pet.name} (${pet.species || "—"})` : (r.petName || r.species || "—")}
+                              {petName} ({species})
                             </Typography>
                             <Typography variant="body2" color="text.secondary">
-                              microchip: {pet?.microchip || r.microchip || "—"}
+                              microchip: {microchip}
                             </Typography>
                           </TableCell>
 
-                          <TableCell>{r.location || r.area || "—"}</TableCell>
+                          <TableCell>{location}</TableCell>
 
                           <TableCell>{statusChip(r.status)}</TableCell>
 
@@ -181,10 +230,6 @@ export default function OwnerMyFoundReports() {
                   )}
                 </TableBody>
               </Table>
-
-              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 2 }}>
-                * Αν δεν έχεις σελίδα λεπτομερειών, πες μου και σου φτιάχνω και το `/owner/found-reports/:id`.
-              </Typography>
             </CardContent>
           </Card>
         </Stack>

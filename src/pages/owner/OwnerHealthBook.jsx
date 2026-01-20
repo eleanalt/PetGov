@@ -125,10 +125,7 @@ export default function OwnerHealthBook() {
                     <b>Φύλο:</b> {pet.sex || "—"}
                   </Typography>
                   <Typography>
-                    <b>Ράτσα:</b> {pet.breed || "—"}
-                  </Typography>
-                  <Typography>
-                    <b>Χρώμα:</b> {pet.color || "—"}
+                    <b>Είδος Ζώου:</b> {pet.species || "—"}
                   </Typography>
                   <Typography sx={{ gridColumn: "1 / -1" }}>
                     <b>Ιδιοκτήτης:</b> {owner?.fullName || "—"}
@@ -210,7 +207,7 @@ export default function OwnerHealthBook() {
               <Button
                 variant="contained"
                 onClick={() => window.print()}
-                sx={{ textTransform: "none", borderRadius: 2, px: 6, bgcolor: "grey.700" }}
+                sx={{ textTransform: "none", borderRadius: 2, px: 6, bgcolor: "primary" }}
               >
                 Εκτύπωση
               </Button>

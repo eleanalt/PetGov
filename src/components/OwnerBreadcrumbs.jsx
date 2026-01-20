@@ -29,8 +29,8 @@ export default function OwnerBreadcrumbs() {
   } else if (pathname.startsWith("/owner/lost-pets")) {
     crumbs.push({ label: "Lost Pets", to: "/owner/lost-pets" });
   } else {
-    // default για /owner (dashboard/οδηγός)
-    crumbs.push({ label: "Οδηγός", to: "/owner" });
+
+    crumbs.push({ label: "Dashboard", to: "/owner" });
   }
 
   const lastIndex = crumbs.length - 1;

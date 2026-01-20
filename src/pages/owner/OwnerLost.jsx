@@ -29,7 +29,14 @@ const STATUS_LABEL = {
 
 // βοηθάει για “πιο πρόσφατο”
 function sortByCreatedAtDesc(a, b) {
-  return String(b?.createdAt || "").localeCompare(String(a?.createdAt || ""));
+  return String(b?.createdAt || b?.date || "").localeCompare(String(a?.createdAt || a?.date || ""));
+}
+
+// ✅ 0544 -> 544
+function normId(x) {
+  const s = String(x ?? "");
+  const t = s.replace(/^0+/, "");
+  return t === "" ? "0" : t;
 }
 
 export default function OwnerLost() {
@@ -54,9 +61,9 @@ export default function OwnerLost() {
       });
       const reportsArr = Array.isArray(fr.data) ? fr.data : [];
 
-      // κρατά μόνο αναφορές που αφορούν δικά σου lostPets
-      const myLostIds = new Set(lostArr.map((x) => String(x.id)));
-      const onlyMine = reportsArr.filter((r) => myLostIds.has(String(r.lostPetId)));
+      // ✅ κρατά μόνο αναφορές που αφορούν δικά σου lostPets (με normId)
+      const myLostIds = new Set(lostArr.map((x) => normId(x.id)));
+      const onlyMine = reportsArr.filter((r) => myLostIds.has(normId(r.lostPetId)));
 
       setFoundReports(onlyMine);
     })();
@@ -66,6 +73,7 @@ export default function OwnerLost() {
 
   /**
    * ✅ Map: lostPetId -> πιο πρόσφατη αναφορά (μη-rejected)
+   * (με normId για να “κολλάει” πάντα)
    */
   const latestReportByLostId = useMemo(() => {
     const m = new Map();
@@ -73,23 +81,23 @@ export default function OwnerLost() {
       .filter((r) => r && r.status !== "rejected")
       .sort(sortByCreatedAtDesc)
       .forEach((r) => {
-        const k = String(r.lostPetId);
-        if (!m.has(k)) m.set(k, r); // επειδή είναι desc, το πρώτο είναι το πιο πρόσφατο
+        const k = normId(r.lostPetId);
+        if (!m.has(k)) m.set(k, r);
       });
     return m;
   }, [foundReports]);
 
   /**
-   * ✅ Κάτω table: ΟΛΕΣ οι αναφορές
+   * ✅ Κάτω table: ΟΛΕΣ οι αναφορές (μη-rejected)
    */
   const allReportsForTable = useMemo(() => {
     return (foundReports || [])
-      .filter((r) => r && r.status !== "rejected") // αν θες να δείχνει ΚΑΙ rejected, βγάλτο
+      .filter((r) => r && r.status !== "rejected")
       .sort(sortByCreatedAtDesc);
   }, [foundReports]);
 
   /**
-   * ✅ Set με IDs “πιο πρόσφατων” αναφορών (για chip στο κάτω table)
+   * ✅ Set με IDs “πιο πρόσφατων” αναφορών
    */
   const latestReportIdSet = useMemo(() => {
     const s = new Set();
@@ -124,7 +132,7 @@ export default function OwnerLost() {
                     textTransform: "none",
                     borderRadius: 2,
                     px: 4,
-                    bgcolor: "grey.700",
+                    bgcolor: "primary",
                     fontWeight: 900,
                   }}
                 >
@@ -171,7 +179,7 @@ export default function OwnerLost() {
                     ) : (
                       latestLost.map((x) => {
                         const st = STATUS_LABEL[x.status] ?? STATUS_LABEL.draft;
-                        const latestReport = latestReportByLostId.get(String(x.id));
+                        const latestReport = latestReportByLostId.get(normId(x.id));
 
                         return (
                           <TableRow key={x.id}>
@@ -182,7 +190,6 @@ export default function OwnerLost() {
                               <Chip label={st.label} color={st.color} size="small" />
                             </TableCell>
 
-                            {/* ΕΝΕΡΓΕΙΕΣ */}
                             <TableCell>
                               <Button
                                 onClick={() => navigate(`/owner/lost/${x.id}`)}
@@ -198,7 +205,6 @@ export default function OwnerLost() {
                               </Button>
                             </TableCell>
 
-                            {/* ΠΙΟ ΠΡΟΣΦΑΤΗ ΑΝΑΦΟΡΑ */}
                             <TableCell>
                               {latestReport ? (
                                 <Button
@@ -268,7 +274,7 @@ export default function OwnerLost() {
                           <TableCell>{r.reporterPhone || "—"}</TableCell>
                           <TableCell>
                             <Button
-                              onClick={() => navigate(`/owner/found/${r.id}`)}
+onClick={() => navigate(`/owner/found/${r.id}`)}
                               sx={{ minWidth: 44, bgcolor: "grey.300", borderRadius: 2 }}
                             >
                               <ArrowForwardIcon />

@@ -71,15 +71,7 @@ export default function VetActsHistory() {
   return (
     <Box sx={{ bgcolor: "grey.100", minHeight: "calc(100vh - 76px)", py: 4 }}>
       <Container maxWidth="lg">
-        <Breadcrumbs aria-label="breadcrumb" sx={{ color: "text.secondary", mb: 2 }}>
-          <MLink component={RouterLink} to="/" underline="hover" color="inherit">
-            Αρχική
-          </MLink>
-          <MLink component={RouterLink} to="/vet/acts" underline="hover" color="inherit">
-            Ιατρικές Πράξεις
-          </MLink>
-          <Typography color="text.primary">Ιστορικό</Typography>
-        </Breadcrumbs>
+      
 
         <Button startIcon={<ArrowBackIcon />} onClick={() => navigate(-1)} sx={{ textTransform: "none", mb: 2 }}>
           Επιστροφή στην προηγούμενη σελίδα
@@ -167,8 +159,9 @@ export default function VetActsHistory() {
             <Box sx={{ display: "flex", justifyContent: "center", mt: 2 }}>
               <Button
                 variant="contained"
+                color="success"
                 onClick={() => navigate(`/vet/acts/new/${pet.id}`)}
-                sx={{ textTransform: "none", borderRadius: 2, px: 6, bgcolor: "grey.700" }}
+                sx={{ textTransform: "none", borderRadius: 2, px: 6 }}
               >
                 Νέα Πράξη
               </Button>

@@ -46,7 +46,7 @@ const STATUS_LABEL = {
   confirmed: { label: "Επιβεβαιωμένο", color: "success" },
   completed: { label: "Πραγματοποιήθηκε", color: "info" },
   cancelled: { label: "Ακυρωμένο", color: "default" },
-  rejected: { label: "Απορρίφθηκε", color: "default" },
+  rejected: { label: "Απορρίφθηκε", color: "error" },
 };
 
 function StatusChip({ status }) {
@@ -255,12 +255,7 @@ export default function VetAppointments() {
 
   const Header = (
     <>
-      <Breadcrumbs aria-label="breadcrumb" sx={{ color: "text.secondary" }}>
-        <MLink component={RouterLink} to="/" underline="hover" color="inherit">
-          Αρχική
-        </MLink>
-        <Typography color="text.primary">Ραντεβού</Typography>
-      </Breadcrumbs>
+     
 
       <Stack direction="row" alignItems="center" justifyContent="space-between">
         <Button
