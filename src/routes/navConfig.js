@@ -10,7 +10,8 @@ export const USER_MENU = {
     { label: "Προφιλ", to: "/owner/profile" },
     { label: "Τα κατοικίδιά μου", to: "/owner/pets" },
     { label: "Τα ραντεβού μου", to: "/owner/appointments" },
-    { label: "Δηλώσεις απώλειας", to: "/owner/lost" }
+    { label: "Δηλώσεις απώλειας", to: "/owner/lost" },
+    { label: "Οι δηλώσεις εύρεσης μου", to: "/owner/found-reports" }
   ],
   vet: [
     { label: "Dashboard", to: "/vet" },

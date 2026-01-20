@@ -24,10 +24,39 @@ import { Link as RouterLink, useNavigate } from "react-router-dom";
 import { api } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 
-// helpers
+/** helpers */
 function timeToMin(t) {
   const [h, m] = String(t).split(":").map(Number);
   return h * 60 + m;
+}
+
+function pad2(n) {
+  return String(n).padStart(2, "0");
+}
+
+/**
+ * Δημιουργεί ISO datetime από date(yyyy-mm-dd) + time(HH:mm) σε local timezone
+ * και επιστρέφει toISOString() (UTC) για αποθήκευση
+ */
+function toIsoFromLocal(dateStr, timeStr) {
+  if (!dateStr || !timeStr) return "";
+  const dt = new Date(`${dateStr}T${timeStr}:00`);
+  if (Number.isNaN(dt.getTime())) return "";
+  return dt.toISOString();
+}
+
+function isPastIso(iso) {
+  if (!iso) return false;
+  const dt = new Date(iso);
+  if (Number.isNaN(dt.getTime())) return false;
+  return dt.getTime() < Date.now();
+}
+
+function fmtDate(yyyy_mm_dd) {
+  if (!yyyy_mm_dd) return "—";
+  const [y, m, d] = String(yyyy_mm_dd).split("-");
+  if (!y || !m || !d) return String(yyyy_mm_dd);
+  return `${d}/${m}/${y}`;
 }
 
 export default function VetAvailabilityEdit() {
@@ -35,9 +64,11 @@ export default function VetAvailabilityEdit() {
   const { user } = useAuth();
 
   const [blocks, setBlocks] = useState([]);
-  const [durations, setDurations] = useState([]); // ✅ from DB
+  const [durations, setDurations] = useState([]); // from DB
   const [msg, setMsg] = useState({ type: "", text: "" });
   const [saving, setSaving] = useState(false);
+
+  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
   const [form, setForm] = useState({
     date: new Date().toISOString().slice(0, 10),
@@ -47,34 +78,58 @@ export default function VetAvailabilityEdit() {
 
   const setField = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
+  const loadBlocks = async () => {
+    if (!user?.id) return;
+    try {
+      const res = await api.get("/vetAvailability", { params: { vetId: String(user.id) } });
+      const arr = Array.isArray(res.data) ? res.data : [];
+
+      // ✅ Φιλτράρουμε ώστε όσα blocks έχουν ΠΕΡΑΣΕΙ (endAt < τώρα) να ΜΗΝ εμφανίζονται
+      const futureOnly = arr.filter((b) => {
+        const endAt =
+          b.endAt ||
+          (b.date && b.endTime ? toIsoFromLocal(b.date, b.endTime) : "");
+        return endAt ? !isPastIso(endAt) : true;
+      });
+
+      setBlocks(futureOnly);
+    } catch (e) {
+      console.error(e);
+      setBlocks([]);
+    }
+  };
+
+  const loadDurations = async () => {
+    if (!user?.id) return;
+    try {
+      const res = await api.get("/vetActDurations", { params: { vetId: String(user.id) } });
+      setDurations(Array.isArray(res.data) ? res.data : []);
+    } catch (e) {
+      console.error(e);
+      setDurations([]);
+    }
+  };
+
   useEffect(() => {
-    (async () => {
-      if (!user?.id) return;
-      try {
-        const res = await api.get("/vetAvailability", { params: { vetId: String(user.id) } });
-        setBlocks(Array.isArray(res.data) ? res.data : []);
-      } catch (e) {
-        console.error(e);
-        setBlocks([]);
-      }
-    })();
+    loadBlocks();
   }, [user?.id]);
 
   useEffect(() => {
-    (async () => {
-      if (!user?.id) return;
-      try {
-        const res = await api.get("/vetActDurations", { params: { vetId: String(user.id) } });
-        setDurations(Array.isArray(res.data) ? res.data : []);
-      } catch (e) {
-        console.error(e);
-        setDurations([]);
-      }
-    })();
+    loadDurations();
+  }, [user?.id]);
+
+  // ✅ Επιπλέον: κάθε 60" κάνε auto-refresh ώστε μόλις περάσει ώρα, να εξαφανίζεται
+  useEffect(() => {
+    const t = setInterval(() => {
+      loadBlocks();
+    }, 60 * 1000);
+    return () => clearInterval(t);
   }, [user?.id]);
 
   const sorted = useMemo(() => {
-    return [...blocks].sort((a, b) => (`${a.date} ${a.startTime}`).localeCompare(`${b.date} ${b.startTime}`));
+    return [...blocks].sort((a, b) =>
+      (`${a.date} ${a.startTime}`).localeCompare(`${b.date} ${b.startTime}`)
+    );
   }, [blocks]);
 
   const minActMinutes = useMemo(() => {
@@ -92,16 +147,58 @@ export default function VetAvailabilityEdit() {
       setMsg({ type: "error", text: "Συμπλήρωσε ημερομηνία και ώρες." });
       return;
     }
+
+    // ✅ μην αφήνεις παρελθοντική ημερομηνία
+    if (date < today) {
+      setMsg({ type: "error", text: "Δεν μπορείς να δηλώσεις block σε παρελθοντική ημερομηνία." });
+      return;
+    }
+
     if (timeToMin(endTime) <= timeToMin(startTime)) {
       setMsg({ type: "error", text: "Η ώρα λήξης πρέπει να είναι μετά την ώρα έναρξης." });
       return;
     }
 
+    // ✅ μην αφήνεις block στο παρελθόν (ίδια μέρα αλλά ώρα πριν από τώρα)
+    const startAt = toIsoFromLocal(date, startTime);
+    const endAt = toIsoFromLocal(date, endTime);
+
+    if (!startAt || !endAt) {
+      setMsg({ type: "error", text: "Λάθος μορφή ημερομηνίας/ώρας." });
+      return;
+    }
+
+    if (isPastIso(startAt)) {
+      setMsg({ type: "error", text: "Η ώρα έναρξης είναι στο παρελθόν. Διάλεξε μελλοντική ώρα." });
+      return;
+    }
+
+    // ✅ ελάχιστη διάρκεια block
     if (minActMinutes > 0 && timeToMin(endTime) - timeToMin(startTime) < minActMinutes) {
       setMsg({
         type: "error",
         text: `Το block πρέπει να είναι τουλάχιστον ${minActMinutes} λεπτά (με βάση τις διάρκειες πράξεων).`,
       });
+      return;
+    }
+
+    // ✅ έλεγχος επικάλυψης με υπάρχοντα blocks (στην ίδια κτηνίατρο)
+    const overlaps = (blocks || []).some((b) => {
+      if (String(b.vetId) !== String(user.id)) return false;
+      if (String(b.date) !== String(date)) return false;
+
+      const aStart = timeToMin(startTime);
+      const aEnd = timeToMin(endTime);
+
+      const bStart = timeToMin(b.startTime);
+      const bEnd = timeToMin(b.endTime);
+
+      // overlap: [aStart,aEnd) with [bStart,bEnd)
+      return aStart < bEnd && bStart < aEnd;
+    });
+
+    if (overlaps) {
+      setMsg({ type: "error", text: "Αυτό το block επικαλύπτεται με άλλο block διαθεσιμότητας." });
       return;
     }
 
@@ -112,12 +209,18 @@ export default function VetAvailabilityEdit() {
         date,
         startTime,
         endTime,
+        // ✅ αποθήκευση σωστά ως ISO timestamps (για μελλοντική χρήση/φιλτράρισμα)
+        startAt,
+        endAt,
         status: "open",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       };
 
-      const res = await api.post("/vetAvailability", payload);
-      setBlocks((prev) => [...prev, res.data]);
+      await api.post("/vetAvailability", payload);
+
       setMsg({ type: "success", text: "Η διαθεσιμότητα προστέθηκε." });
+      await loadBlocks();
     } catch (e) {
       console.error(e);
       setMsg({ type: "error", text: "Αποτυχία προσθήκης διαθεσιμότητας." });
@@ -136,6 +239,34 @@ export default function VetAvailabilityEdit() {
     } catch (e) {
       console.error(e);
       setMsg({ type: "error", text: "Αποτυχία διαγραφής." });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ✅ προαιρετικό: σβήνει από DB όσα blocks έχουν λήξει (δεν θα ξαναφανούν ποτέ)
+  const cleanupPastBlocks = async () => {
+    if (!user?.id) return;
+    setMsg({ type: "", text: "" });
+    setSaving(true);
+    try {
+      const res = await api.get("/vetAvailability", { params: { vetId: String(user.id) } });
+      const arr = Array.isArray(res.data) ? res.data : [];
+
+      const past = arr.filter((b) => {
+        const endAt =
+          b.endAt ||
+          (b.date && b.endTime ? toIsoFromLocal(b.date, b.endTime) : "");
+        return endAt ? isPastIso(endAt) : false;
+      });
+
+      await Promise.all(past.map((b) => api.delete(`/vetAvailability/${b.id}`)));
+
+      setMsg({ type: "success", text: "Καθαρίστηκαν τα παλιά blocks." });
+      await loadBlocks();
+    } catch (e) {
+      console.error(e);
+      setMsg({ type: "error", text: "Αποτυχία καθαρισμού παλιών blocks." });
     } finally {
       setSaving(false);
     }
@@ -174,13 +305,13 @@ export default function VetAvailabilityEdit() {
                   Επεξεργασία Διαθεσιμότητας
                 </Typography>
                 <Typography color="text.secondary" sx={{ textAlign: "center" }}>
-                  Δηλώνεις τα κενά σου ως χρονικά blocks. Τα διαθέσιμα ραντεβού θα προκύπτουν αυτόματα ανάλογα με τη διάρκεια της πράξης.
+                  Δήλωσε blocks μόνο σε <b>μελλοντικές</b> ημερομηνίες/ώρες. Όσα blocks έχουν περάσει δεν εμφανίζονται.
                 </Typography>
               </Stack>
 
               <Divider sx={{ my: 3 }} />
 
-              {/* ✅ durations + button to edit them */}
+              {/* durations + button */}
               <Box sx={{ display: "flex", justifyContent: "center", mb: 1 }}>
                 <Button
                   variant="outlined"
@@ -216,6 +347,7 @@ export default function VetAvailabilityEdit() {
                     value={form.date}
                     onChange={setField("date")}
                     InputLabelProps={{ shrink: true }}
+                    inputProps={{ min: today }} // ✅ μόνο από σήμερα και μετά
                     fullWidth
                   />
 
@@ -247,6 +379,15 @@ export default function VetAvailabilityEdit() {
                     Προσθήκη block διαθεσιμότητας
                   </Button>
 
+                  <Button
+                    variant="text"
+                    onClick={cleanupPastBlocks}
+                    disabled={saving}
+                    sx={{ textTransform: "none", width: "fit-content", mx: "auto" }}
+                  >
+                    Καθαρισμός παλιών blocks
+                  </Button>
+
                   <Typography variant="caption" color="text.secondary" sx={{ textAlign: "center" }}>
                     Παράδειγμα: Αν βάλεις 10:00–14:00, τότε για “Κλινική Εξέταση (30’)” θα μπορούν να εμφανιστούν start times όπως 10:00, 10:30, 11:00 κ.ο.κ.
                   </Typography>
@@ -257,7 +398,7 @@ export default function VetAvailabilityEdit() {
 
               {/* Table */}
               <Typography fontWeight={900} sx={{ mb: 1 }}>
-                Τα blocks διαθεσιμότητάς μου
+                Τα blocks διαθεσιμότητάς μου (μελλοντικά)
               </Typography>
 
               <Table>
@@ -285,7 +426,7 @@ export default function VetAvailabilityEdit() {
                       const dur = timeToMin(b.endTime) - timeToMin(b.startTime);
                       return (
                         <TableRow key={b.id}>
-                          <TableCell>{b.date}</TableCell>
+                          <TableCell>{fmtDate(b.date)}</TableCell>
                           <TableCell>{b.startTime}</TableCell>
                           <TableCell>{b.endTime}</TableCell>
                           <TableCell>{dur}’</TableCell>

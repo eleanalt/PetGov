@@ -16,7 +16,6 @@ import EditIcon from "@mui/icons-material/Edit";
 import CheckIcon from "@mui/icons-material/Check";
 import CloseIcon from "@mui/icons-material/Close";
 import PhotoCameraOutlinedIcon from "@mui/icons-material/PhotoCameraOutlined";
-import VetBreadcrumbs from "../../components/OwnerBreadcrumbs";
 import { useNavigate } from "react-router-dom";
 import { api } from "../../api/client";
 
@@ -306,7 +305,6 @@ export default function VetProfile() {
   return (
     <Box sx={{ bgcolor: "grey.100", minHeight: "calc(100vh - 76px)", py: 4 }}>
       <Container maxWidth="lg">
-        <VetBreadcrumbs />
         <Button
           startIcon={<ArrowBackIcon />}
           onClick={() => navigate("/")}

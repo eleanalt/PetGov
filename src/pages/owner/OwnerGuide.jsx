@@ -18,12 +18,6 @@ export default function OwnerGuide() {
     <Box sx={{ bgcolor: "grey.100", minHeight: "calc(100vh - 76px)", py: 4 }}>
       <Container maxWidth="lg">
         <Stack spacing={2}>
-          <Breadcrumbs sx={{ color: "text.secondary" }}>
-            <MLink component={RouterLink} to="/" underline="hover" color="inherit">
-              Αρχική
-            </MLink>
-            <Typography color="text.primary">Πληροφορίες</Typography>
-          </Breadcrumbs>
 
           <Button
             startIcon={<ArrowBackIcon />}

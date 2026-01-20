@@ -10,6 +10,7 @@ import {
   Stack,
   TextField,
   Typography,
+  MenuItem,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import EditIcon from "@mui/icons-material/Edit";
@@ -20,6 +21,7 @@ import VetBreadcrumbs from "../../components/VetBreadcrumbs";
 import { useNavigate } from "react-router-dom";
 import { api } from "../../api/client";
 
+/** ===== helpers για να βρίσκει τον logged-in χρήστη από storage ===== */
 function normalizeUser(obj) {
   if (!obj) return null;
   if (obj.user?.id) return obj.user;
@@ -30,8 +32,7 @@ function normalizeUser(obj) {
 
 function tryParse(raw) {
   if (!raw) return null;
-  // αν έχει αποθηκευτεί σκέτο id σαν string "2"
-  if (/^\d+$/.test(raw)) return { id: raw };
+  if (/^\d+$/.test(raw)) return { id: raw }; // αν έχει αποθηκευτεί σκέτο id "2"
   try {
     return JSON.parse(raw);
   } catch {
@@ -51,7 +52,6 @@ function getStoredUser() {
     "petgovUser",
   ];
 
-  // 1) preferred keys
   for (const storage of storages) {
     for (const k of preferredKeys) {
       const parsed = tryParse(storage.getItem(k));
@@ -60,7 +60,6 @@ function getStoredUser() {
     }
   }
 
-  // 2) brute-force όλα τα keys (για να πιάσει το δικό σου login όπως κι αν το έγραψες)
   for (const storage of storages) {
     for (let i = 0; i < storage.length; i++) {
       const key = storage.key(i);
@@ -73,6 +72,7 @@ function getStoredUser() {
   return null;
 }
 
+/** ===== UI bits ===== */
 function PhotoPlaceholder() {
   return (
     <Box
@@ -108,7 +108,10 @@ function Row({
   inputValue,
   setInputValue,
   type = "text",
+  options = null, // ✅ αν έχει options => dropdown
 }) {
+  const isSelect = Array.isArray(options) && options.length > 0;
+
   return (
     <Box sx={{ py: 1.4 }}>
       <Stack direction="row" alignItems="center" spacing={2}>
@@ -127,9 +130,18 @@ function Row({
                   onChange={(e) => setInputValue(e.target.value)}
                   size="small"
                   fullWidth
-                  type={type}
+                  type={isSelect ? "text" : type}
                   placeholder="—"
-                />
+                  select={isSelect}
+                >
+                  {isSelect &&
+                    options.map((opt) => (
+                      <MenuItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </MenuItem>
+                    ))}
+                </TextField>
+
                 <IconButton onClick={onSave} aria-label="save">
                   <CheckIcon />
                 </IconButton>
@@ -202,7 +214,11 @@ export default function VetProfile() {
             Κάνε login και βεβαιώσου ότι αποθηκεύεις τον χρήστη στο localStorage ή
             sessionStorage.
           </Typography>
-          <Button sx={{ mt: 2 }} variant="contained" onClick={() => navigate("/login")}>
+          <Button
+            sx={{ mt: 2 }}
+            variant="contained"
+            onClick={() => navigate("/login")}
+          >
             Σύνδεση
           </Button>
         </Container>
@@ -212,20 +228,61 @@ export default function VetProfile() {
 
   if (!profile || !draft) return null;
 
+  /** ✅ fields με dropdowns */
   const fields = [
     { key: "fullName", label: "Ονοματεπώνυμο" },
     { key: "email", label: "Email" },
     { key: "afm", label: "ΑΦΜ" },
     { key: "phone", label: "Τηλέφωνο" },
-    { key: "gender", label: "Φύλο" },
-    { key: "educationLevel", label: "Επίπεδο σπουδών" },
-    { key: "experienceYears", label: "Εμπειρία (έτη)", type: "number" },
+
+    {
+      key: "gender",
+      label: "Φύλο",
+      options: [
+        { value: "", label: "—" },
+        { value: "Αρσενικό", label: "Αρσενικό" },
+        { value: "Θηλυκό", label: "Θηλυκό" },
+        { value: "Άλλο", label: "Άλλο" },
+      ],
+    },
+
+    {
+      key: "educationLevel",
+      label: "Επίπεδο σπουδών",
+      options: [
+        { value: "", label: "—" },
+        { value: "Απολυτήριο", label: "Απολυτήριο" },
+        { value: "ΙΕΚ", label: "ΙΕΚ" },
+        { value: "Πτυχίο", label: "Πτυχίο" },
+        { value: "Μεταπτυχιακό", label: "Μεταπτυχιακό" },
+        { value: "Διδακτορικό", label: "Διδακτορικό" },
+      ],
+    },
+
+    {
+      key: "experienceYears",
+      label: "Εμπειρία (έτη)",
+      options: Array.from({ length: 41 }, (_, i) => ({
+        value: String(i),
+        label: `${i}`,
+      })),
+    },
+
     { key: "clinicName", label: "Επωνυμία" },
     { key: "clinicAddress", label: "Διεύθυνση" },
   ];
 
   const startEditField = (key) => {
     setActiveField(key);
+
+    // ✅ Αν είναι experienceYears, πάντα string στο input (για select)
+    if (key === "experienceYears") {
+      setActiveValue(
+        (draft?.[key] ?? draft?.[key] === 0) ? String(draft?.[key]) : ""
+      );
+      return;
+    }
+
     setActiveValue(draft?.[key] ?? "");
   };
 
@@ -236,13 +293,21 @@ export default function VetProfile() {
 
   const saveEditFieldToDraft = () => {
     if (!activeField) return;
-    setDraft((d) => ({ ...d, [activeField]: activeValue }));
+
+    let v = activeValue;
+
+    // ✅ αποθήκευση years σαν number
+    if (activeField === "experienceYears") {
+      v = v === "" ? "" : Number(v);
+    }
+
+    setDraft((d) => ({ ...d, [activeField]: v }));
     setActiveField(null);
     setActiveValue("");
   };
 
   const cancelWholeEdit = () => {
-    setDraft(profile); // επαναφορά
+    setDraft(profile);
     setEditMode(false);
     cancelEditField();
   };
@@ -273,23 +338,26 @@ export default function VetProfile() {
           Επιστροφή στην αρχική σελίδα
         </Button>
 
-        {/* Title + right button */}
-        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="space-between"
+          sx={{ mb: 2 }}
+        >
           <Typography variant="h3" fontWeight={900}>
             Επαγγελματικό Προφίλ
           </Typography>
 
           {!editMode && (
-  <Button
-    variant="outlined"
-    startIcon={<EditIcon />}
-    onClick={() => setEditMode(true)}
-    sx={{ textTransform: "none", borderRadius: 999 }}
-  >
-    Επεξεργασία
-  </Button>
-)}
-
+            <Button
+              variant="outlined"
+              startIcon={<EditIcon />}
+              onClick={() => setEditMode(true)}
+              sx={{ textTransform: "none", borderRadius: 999 }}
+            >
+              Επεξεργασία
+            </Button>
+          )}
         </Stack>
 
         <Card variant="outlined" sx={{ borderRadius: 6 }}>
@@ -339,26 +407,43 @@ export default function VetProfile() {
                     inputValue={activeValue}
                     setInputValue={setActiveValue}
                     type={f.type || "text"}
+                    options={f.options || null}
                   />
                 ))}
 
-                {/* ✅ Κουμπιά κάτω από τις πληροφορίες */}
                 {editMode && (
                   <Box sx={{ pt: 2 }}>
                     <Stack direction="row" justifyContent="center" spacing={2}>
                       <Button
-                        variant="outlined"
-                        onClick={cancelWholeEdit}
-                        sx={{ textTransform: "none", borderRadius: 999, px: 4 }}
-                        disabled={!!activeField}
-                      >
-                        Ακύρωση
-                      </Button>
+  variant="outlined"
+  color="error"
+  onClick={cancelWholeEdit}
+  sx={{
+    textTransform: "none",
+    borderRadius: 999,
+    px: 4,
+    borderColor: "error.main",
+    color: "error.main",
+    "&:hover": {
+      borderColor: "error.dark",
+      backgroundColor: "rgba(211, 47, 47, 0.08)", // προαιρετικό
+    },
+  }}
+  disabled={!!activeField}
+>
+  Ακύρωση
+</Button>
+
 
                       <Button
                         variant="contained"
                         onClick={finishEdit}
-                        sx={{ textTransform: "none", borderRadius: 999, px: 4, fontWeight: 900 }}
+                        sx={{
+                          textTransform: "none",
+                          borderRadius: 999,
+                          px: 4,
+                          fontWeight: 900,
+                        }}
                         disabled={!!activeField}
                       >
                         Ολοκλήρωση επεξεργασίας

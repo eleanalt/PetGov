@@ -26,6 +26,20 @@ import { useAuth } from "../../auth/AuthContext";
 function a11yProps(index) {
   return { id: `appt-tab-${index}`, "aria-controls": `appt-tabpanel-${index}` };
 }
+const TAB_THEME = {
+  0: { text: "warning.main", solidBg: "warning.main", solidHover: "warning.dark", solidText: "common.white" },
+  1: { text: "success.main", solidBg: "success.main", solidHover: "success.dark", solidText: "common.white" },
+  2: { text: "info.main",    solidBg: "info.main",    solidHover: "info.dark",    solidText: "common.white" },
+  3: { text: "error.main",   solidBg: "error.main",   solidHover: "error.dark",   solidText: "common.white" },
+};
+
+
+const TAB_COLORS = {
+  0: { bg: "warning.main", hover: "warning.dark", text: "common.white" }, // Αιτήματα
+  1: { bg: "success.main", hover: "success.dark", text: "common.white" }, // Επιβεβαιωμένα
+  2: { bg: "info.main", hover: "info.dark", text: "common.white" },       // Ολοκληρωμένα
+  3: { bg: "error.main", hover: "error.dark", text: "common.white" },     // Ακυρώσεις
+};
 
 const STATUS_LABEL = {
   pending: { label: "Εκκρεμές", color: "default" },
@@ -38,6 +52,77 @@ const STATUS_LABEL = {
 function StatusChip({ status }) {
   const st = STATUS_LABEL[status] || { label: status || "—", color: "default" };
   return <Chip label={st.label} color={st.color} size="small" sx={{ textTransform: "none" }} />;
+}
+
+/** ---- Helpers για τα 2 formats της βάσης σου ---- */
+function fmtDate(dateStr) {
+  if (!dateStr) return "—";
+  const [y, m, d] = String(dateStr).split("-");
+  if (!y || !m || !d) return String(dateStr);
+  return `${d}/${m}/${y}`;
+}
+
+function fmtApptWhen(a) {
+  // Format A: date + time
+  if (a?.date && a?.time) return `${fmtDate(a.date)} ${a.time}`;
+  if (a?.date) return fmtDate(a.date);
+
+  // Format B: datetime ISO
+  if (a?.datetime) {
+    const dt = new Date(a.datetime);
+    if (Number.isNaN(dt.getTime())) return "—";
+    const dd = String(dt.getDate()).padStart(2, "0");
+    const mm = String(dt.getMonth() + 1).padStart(2, "0");
+    const yyyy = dt.getFullYear();
+    const hh = String(dt.getHours()).padStart(2, "0");
+    const mi = String(dt.getMinutes()).padStart(2, "0");
+    return `${dd}/${mm}/${yyyy} ${hh}:${mi}`;
+  }
+
+  return "—";
+}
+
+function getActLabel(a) {
+  return a?.actType || a?.service || "—";
+}
+
+function fmtIso(iso) {
+  if (!iso) return "—";
+  const dt = new Date(iso);
+  if (Number.isNaN(dt.getTime())) return String(iso);
+  const dd = String(dt.getDate()).padStart(2, "0");
+  const mm = String(dt.getMonth() + 1).padStart(2, "0");
+  const yyyy = dt.getFullYear();
+  const hh = String(dt.getHours()).padStart(2, "0");
+  const mi = String(dt.getMinutes()).padStart(2, "0");
+  return `${dd}/${mm}/${yyyy} ${hh}:${mi}`;
+}
+
+// για auto "completed" όταν περάσει η ώρα
+function getApptDateObj(a) {
+  if (a?.datetime) {
+    const d = new Date(a.datetime);
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+  if (a?.date) {
+    const t = a?.time || "00:00";
+    const d = new Date(`${a.date}T${t}:00`);
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+  return null;
+}
+
+function getEffectiveStatus(a) {
+  const st = a?.status;
+
+  // "κλειδωμένα"
+  if (st === "cancelled" || st === "rejected" || st === "completed") return st;
+
+  // auto ολοκλήρωση όταν περάσει
+  const dt = getApptDateObj(a);
+  if (dt && dt.getTime() < Date.now()) return "completed";
+
+  return st || "pending";
 }
 
 export default function VetAppointments() {
@@ -101,11 +186,20 @@ export default function VetAppointments() {
     return m;
   }, [users]);
 
+  // χρησιμοποιεί effective status (auto completed)
   const rows = useMemo(() => {
-    const pending = appointments.filter((a) => a.status === "pending");
-    const confirmed = appointments.filter((a) => a.status === "confirmed");
-    const completed = appointments.filter((a) => a.status === "completed");
-    const cancelled = appointments.filter((a) => a.status === "cancelled" || a.status === "rejected");
+    const list = (appointments || []).map((a) => ({
+      ...a,
+      __effectiveStatus: getEffectiveStatus(a),
+    }));
+
+    const pending = list.filter((a) => a.__effectiveStatus === "pending");
+    const confirmed = list.filter((a) => a.__effectiveStatus === "confirmed");
+    const completed = list.filter((a) => a.__effectiveStatus === "completed");
+    const cancelled = list.filter(
+      (a) => a.__effectiveStatus === "cancelled" || a.__effectiveStatus === "rejected"
+    );
+
     return { pending, confirmed, completed, cancelled };
   }, [appointments]);
 
@@ -119,17 +213,22 @@ export default function VetAppointments() {
     setSelectedAppt(null);
   };
 
-  const isLocked = (status) => status === "cancelled" || status === "rejected" || status === "completed";
+  const isLocked = (status) =>
+    status === "cancelled" || status === "rejected" || status === "completed";
 
   const patchStatus = async (appt, status) => {
     if (!appt?.id) return;
 
-    // αν ήδη κλειδωμένο -> stop
-    if (isLocked(appt.status)) return;
+    // ΔΕΝ επιτρέπουμε manual "completed"
+    if (status === "completed") return;
 
-    // κανόνες transitions
-    if (appt.status === "pending" && !["confirmed", "rejected"].includes(status)) return;
-    if (appt.status === "confirmed" && !["completed", "cancelled"].includes(status)) return;
+    // αν στο UI έχει γίνει auto completed, το κλειδώνουμε
+    const eff = getEffectiveStatus(appt);
+    if (isLocked(eff)) return;
+
+    // transitions
+    if (eff === "pending" && !["confirmed", "rejected"].includes(status)) return;
+    if (eff === "confirmed" && !["cancelled"].includes(status)) return;
 
     try {
       const now = new Date().toISOString();
@@ -139,8 +238,6 @@ export default function VetAppointments() {
           ? { cancelledAt: now, cancelledBy: "vet" }
           : status === "rejected"
           ? { cancelledAt: now, cancelledBy: "vet" }
-          : status === "completed"
-          ? { completedAt: now }
           : {};
 
       await api.patch(`/appointments/${appt.id}`, {
@@ -175,19 +272,20 @@ export default function VetAppointments() {
         </Button>
 
         <Button
-          variant="contained"
-          onClick={() => navigate("/vet/availability")}
-          sx={{
-            textTransform: "none",
-            borderRadius: 999,
-            fontWeight: 900,
-            px: 3,
-            bgcolor: "grey.700",
-            "&:hover": { bgcolor: "grey.800" },
-          }}
-        >
-          Ορισμός Διαθεσιμότητας
-        </Button>
+  variant="contained"
+  onClick={() => navigate("/vet/availability")}
+  sx={{
+    textTransform: "none",
+    borderRadius: 999,
+    fontWeight: 900,
+    px: 3,
+    bgcolor: "primary.main",
+    "&:hover": { bgcolor: "primary.dark" },
+  }}
+>
+  Ορισμός Διαθεσιμότητας
+</Button>
+
       </Stack>
 
       <Typography variant="h4" fontWeight={900} sx={{ textAlign: "center", mt: 1 }}>
@@ -203,58 +301,122 @@ export default function VetAppointments() {
           {Header}
 
           <Box sx={{ display: "flex", justifyContent: "center" }}>
-            <Card
-              variant="outlined"
-              sx={{
-                width: "min(820px, 100%)",
-                borderRadius: 3,
-              }}
-            >
+            <Card variant="outlined" sx={{ width: "min(820px, 100%)", borderRadius: 3 }}>
               <CardContent sx={{ p: { xs: 2, md: 3 } }}>
                 {/* Tabs pill-style */}
                 <Box
-                  sx={{
-                    bgcolor: "grey.200",
-                    borderRadius: 999,
-                    p: 0.5,
-                    width: "fit-content",
-                    mx: "auto",
-                  }}
-                >
-                  <Tabs
-                    value={tab}
-                    onChange={(_, v) => setTab(v)}
-                    variant="scrollable"
-                    scrollButtons={false}
-                    TabIndicatorProps={{ style: { display: "none" } }}
-                    sx={{
-                      minHeight: 44,
-                      "& .MuiTab-root": {
-                        minHeight: 44,
-                        textTransform: "none",
-                        borderRadius: 999,
-                        px: 3,
-                        fontWeight: 800,
-                        color: "text.primary",
-                      },
-                      "& .MuiTab-root.Mui-selected": {
-                        bgcolor: "common.white",
-                        boxShadow: "0 2px 10px rgba(0,0,0,0.08)",
-                      },
-                    }}
-                  >
-                    <Tab label="Αιτήματα" {...a11yProps(0)} />
-                    <Tab label="Επιβεβαιωμένα" {...a11yProps(1)} />
-                    <Tab label="Ολοκληρωμένα" {...a11yProps(2)} />
-                    <Tab label="Ακυρώσεις" {...a11yProps(3)} />
-                  </Tabs>
-                </Box>
+  sx={{
+    bgcolor: "grey.200",
+    borderRadius: 999,
+    p: 0.6,
+    width: "fit-content",
+    mx: "auto",
+  }}
+>
+  <Tabs
+    value={tab}
+    onChange={(_, v) => setTab(v)}
+    variant="scrollable"
+    scrollButtons={false}
+    TabIndicatorProps={{ style: { display: "none" } }}
+    sx={{
+      minHeight: 44,
+      "& .MuiTab-root": {
+        minHeight: 44,
+        textTransform: "none",
+        borderRadius: 999,
+        px: 3,
+        fontWeight: 900,
+        transition: "all .15s ease",
+        border: "2px solid transparent",
+      },
+
+      // default (όλα τα tabs έχουν soft χρώμα + περίγραμμα + χρωματιστό κείμενο)
+      "& .MuiTab-root[data-tab='0']": {
+        bgcolor: TAB_THEME[0].softBg,
+        borderColor: TAB_THEME[0].border,
+        color: TAB_THEME[0].text,
+      },
+      "& .MuiTab-root[data-tab='1']": {
+        bgcolor: TAB_THEME[1].softBg,
+        borderColor: TAB_THEME[1].border,
+        color: TAB_THEME[1].text,
+      },
+      "& .MuiTab-root[data-tab='2']": {
+        bgcolor: TAB_THEME[2].softBg,
+        borderColor: TAB_THEME[2].border,
+        color: TAB_THEME[2].text,
+      },
+      "& .MuiTab-root[data-tab='3']": {
+        bgcolor: TAB_THEME[3].softBg,
+        borderColor: TAB_THEME[3].border,
+        color: TAB_THEME[3].text,
+      },
+
+      // selected = solid
+      "& .MuiTab-root.Mui-selected": {
+        boxShadow: "0 2px 10px rgba(0,0,0,0.12)",
+      },
+
+      "& .MuiTab-root.Mui-selected[data-tab='0']": {
+        bgcolor: TAB_THEME[0].solidBg,
+        color: TAB_THEME[0].solidText,
+        borderColor: TAB_THEME[0].solidBg,
+      },
+      "& .MuiTab-root.Mui-selected[data-tab='0']:hover": {
+        bgcolor: TAB_THEME[0].solidHover,
+        borderColor: TAB_THEME[0].solidHover,
+      },
+
+      "& .MuiTab-root.Mui-selected[data-tab='1']": {
+        bgcolor: TAB_THEME[1].solidBg,
+        color: TAB_THEME[1].solidText,
+        borderColor: TAB_THEME[1].solidBg,
+      },
+      "& .MuiTab-root.Mui-selected[data-tab='1']:hover": {
+        bgcolor: TAB_THEME[1].solidHover,
+        borderColor: TAB_THEME[1].solidHover,
+      },
+
+      "& .MuiTab-root.Mui-selected[data-tab='2']": {
+        bgcolor: TAB_THEME[2].solidBg,
+        color: TAB_THEME[2].solidText,
+        borderColor: TAB_THEME[2].solidBg,
+      },
+      "& .MuiTab-root.Mui-selected[data-tab='2']:hover": {
+        bgcolor: TAB_THEME[2].solidHover,
+        borderColor: TAB_THEME[2].solidHover,
+      },
+
+      "& .MuiTab-root.Mui-selected[data-tab='3']": {
+        bgcolor: TAB_THEME[3].solidBg,
+        color: TAB_THEME[3].solidText,
+        borderColor: TAB_THEME[3].solidBg,
+      },
+      "& .MuiTab-root.Mui-selected[data-tab='3']:hover": {
+        bgcolor: TAB_THEME[3].solidHover,
+        borderColor: TAB_THEME[3].solidHover,
+      },
+    }}
+  >
+    <Tab label="Αιτήματα" {...a11yProps(0)} value={0} data-tab="0" />
+    <Tab label="Επιβεβαιωμένα" {...a11yProps(1)} value={1} data-tab="1" />
+    <Tab label="Ολοκληρωμένα" {...a11yProps(2)} value={2} data-tab="2" />
+    <Tab label="Ακυρώσεις" {...a11yProps(3)} value={3} data-tab="3" />
+  </Tabs>
+</Box>
 
                 <Divider sx={{ my: 2.5 }} />
 
                 {/* TAB 1: Αιτήματα */}
                 {tab === 0 && (
                   <Stack spacing={2}>
+                    {loading && (
+                      <Typography color="text.secondary" sx={{ textAlign: "center" }}>
+                        Φόρτωση...
+                      </Typography>
+                    )}
+
                     {!loading && rows.pending.length === 0 && (
                       <Typography color="text.secondary" sx={{ textAlign: "center" }}>
                         Δεν υπάρχουν αιτήματα προς το παρόν.
@@ -266,14 +428,7 @@ export default function VetAppointments() {
                       const owner = userById.get(String(a.ownerId));
 
                       return (
-                        <Box
-                          key={a.id}
-                          sx={{
-                            bgcolor: "grey.100",
-                            borderRadius: 3,
-                            p: 2,
-                          }}
-                        >
+                        <Box key={a.id} sx={{ bgcolor: "grey.100", borderRadius: 3, p: 2 }}>
                           <Typography fontWeight={800} sx={{ mb: 0.5 }}>
                             {idx + 1}.
                           </Typography>
@@ -282,13 +437,13 @@ export default function VetAppointments() {
                             <b>Ζώο:</b> {pet?.name ?? "—"} ({pet?.species ?? "—"})
                           </Typography>
                           <Typography>
-                            <b>Ιδιοκτήτης:</b> {owner?.fullName ?? "—"}
+                            <b>Ιδιοκτήτης:</b> {owner?.fullName ?? a.contactName ?? "—"}
                           </Typography>
                           <Typography>
-                            <b>Ημερομηνία:</b> {a.date ?? "—"} {a.time ? `(${a.time})` : ""}
+                            <b>Ημερομηνία/Ώρα:</b> {fmtApptWhen(a)}
                           </Typography>
                           <Typography>
-                            <b>Πράξη:</b> {a.actType ?? "—"}
+                            <b>Πράξη:</b> {getActLabel(a)}
                           </Typography>
 
                           <Stack direction="row" spacing={2} sx={{ mt: 1.5 }}>
@@ -338,80 +493,61 @@ export default function VetAppointments() {
                       <Box sx={{ px: { xs: 0, md: 1 } }}>
                         <Stack
                           direction="row"
-                          sx={{
-                            fontWeight: 900,
-                            color: "text.secondary",
-                            px: 1,
-                            mb: 1,
-                          }}
+                          sx={{ fontWeight: 900, color: "text.secondary", px: 1, mb: 1 }}
                         >
                           <Box sx={{ width: 56 }}>#</Box>
-                          <Box sx={{ flex: 1 }}>Κωδικός Ραντεβού</Box>
-                          <Box sx={{ width: 140 }}>Ημερομηνία</Box>
+                          <Box sx={{ flex: 1 }}>Ιδιοκτήτης</Box>
+                          <Box sx={{ width: 200 }}>Ημερομηνία/Ώρα</Box>
                           <Box sx={{ width: 220, textAlign: "right" }} />
                         </Stack>
 
                         <Divider sx={{ mb: 1.5 }} />
 
                         <Stack spacing={1.2}>
-                          {rows.confirmed.map((a, i) => (
-                            <Stack
-                              key={a.id}
-                              direction="row"
-                              alignItems="center"
-                              sx={{
-                                bgcolor: "grey.50",
-                                borderRadius: 2,
-                                px: 1,
-                                py: 1.2,
-                              }}
-                            >
-                              <Box sx={{ width: 56, fontWeight: 800 }}>{i + 1}.</Box>
-                              <Box sx={{ flex: 1, fontWeight: 700 }}>#{a.id}</Box>
-                              <Box sx={{ width: 140 }}>{a.date ?? "—"}</Box>
+                          {rows.confirmed.map((a, i) => {
+                            const owner = userById.get(String(a.ownerId));
+                            return (
+                              <Stack
+                                key={a.id}
+                                direction="row"
+                                alignItems="center"
+                                sx={{ bgcolor: "grey.50", borderRadius: 2, px: 1, py: 1.2 }}
+                              >
+                                <Box sx={{ width: 56, fontWeight: 800 }}>{i + 1}.</Box>
+                                <Box sx={{ flex: 1, fontWeight: 700 }}>
+                                  {owner?.fullName ?? a.contactName ?? "—"}
+                                </Box>
+                                <Box sx={{ width: 200 }}>{fmtApptWhen(a)}</Box>
 
-                              <Box sx={{ width: 220, textAlign: "right" }}>
-                                <Stack direction="row" spacing={1} justifyContent="flex-end">
-                                  <Button
-                                    variant="text"
-                                    onClick={() => openDetails(a)}
-                                    sx={{ textTransform: "none" }}
-                                  >
-                                    Προβολή
-                                  </Button>
+                                <Box sx={{ width: 220, textAlign: "right" }}>
+                                  <Stack direction="row" spacing={1} justifyContent="flex-end">
+                                    <Button
+                                      variant="text"
+                                      onClick={() => openDetails(a)}
+                                      sx={{ textTransform: "none" }}
+                                    >
+                                      Προβολή
+                                    </Button>
 
-                                  <Button
-                                    variant="contained"
-                                    onClick={() => patchStatus(a, "completed")}
-                                    sx={{
-                                      textTransform: "none",
-                                      borderRadius: 999,
-                                      px: 2,
-                                      bgcolor: "grey.700",
-                                      "&:hover": { bgcolor: "grey.800" },
-                                    }}
-                                  >
-                                    Πραγματοποιήθηκε
-                                  </Button>
-
-                                  <Button
-                                    variant="contained"
-                                    onClick={() => patchStatus(a, "cancelled")}
-                                    sx={{
-                                      textTransform: "none",
-                                      borderRadius: 999,
-                                      px: 2,
-                                      bgcolor: "grey.300",
-                                      color: "error.main",
-                                      "&:hover": { bgcolor: "grey.400" },
-                                    }}
-                                  >
-                                    Ακύρωση
-                                  </Button>
-                                </Stack>
-                              </Box>
-                            </Stack>
-                          ))}
+                                    <Button
+                                      variant="contained"
+                                      onClick={() => patchStatus(a, "cancelled")}
+                                      sx={{
+                                        textTransform: "none",
+                                        borderRadius: 999,
+                                        px: 2,
+                                        bgcolor: "grey.300",
+                                        color: "error.main",
+                                        "&:hover": { bgcolor: "grey.400" },
+                                      }}
+                                    >
+                                      Ακύρωση
+                                    </Button>
+                                  </Stack>
+                                </Box>
+                              </Stack>
+                            );
+                          })}
                         </Stack>
                       </Box>
                     )}
@@ -429,48 +565,43 @@ export default function VetAppointments() {
                       <Box sx={{ px: { xs: 0, md: 1 } }}>
                         <Stack
                           direction="row"
-                          sx={{
-                            fontWeight: 900,
-                            color: "text.secondary",
-                            px: 1,
-                            mb: 1,
-                          }}
+                          sx={{ fontWeight: 900, color: "text.secondary", px: 1, mb: 1 }}
                         >
                           <Box sx={{ width: 56 }}>#</Box>
-                          <Box sx={{ width: 180 }}>Κωδικός</Box>
-                          <Box sx={{ flex: 1 }}>Ημερομηνία</Box>
+                          <Box sx={{ width: 260 }}>Ιδιοκτήτης</Box>
+                          <Box sx={{ flex: 1 }}>Ημερομηνία/Ώρα</Box>
                           <Box sx={{ width: 190, textAlign: "right" }} />
                         </Stack>
 
                         <Divider sx={{ mb: 1.5 }} />
 
                         <Stack spacing={1.2}>
-                          {rows.completed.map((a, i) => (
-                            <Stack
-                              key={a.id}
-                              direction="row"
-                              alignItems="center"
-                              sx={{
-                                bgcolor: "grey.50",
-                                borderRadius: 2,
-                                px: 1,
-                                py: 1.2,
-                              }}
-                            >
-                              <Box sx={{ width: 56, fontWeight: 800 }}>{i + 1}.</Box>
-                              <Box sx={{ width: 180, fontWeight: 700 }}>#{a.id}</Box>
-                              <Box sx={{ flex: 1 }}>{a.date ?? "—"}</Box>
-                              <Box sx={{ width: 190, textAlign: "right" }}>
-                                <Button
-                                  variant="text"
-                                  onClick={() => openDetails(a)}
-                                  sx={{ textTransform: "none" }}
-                                >
-                                  Προβολή λεπτομερειών
-                                </Button>
-                              </Box>
-                            </Stack>
-                          ))}
+                          {rows.completed.map((a, i) => {
+                            const owner = userById.get(String(a.ownerId));
+                            return (
+                              <Stack
+                                key={a.id}
+                                direction="row"
+                                alignItems="center"
+                                sx={{ bgcolor: "grey.50", borderRadius: 2, px: 1, py: 1.2 }}
+                              >
+                                <Box sx={{ width: 56, fontWeight: 800 }}>{i + 1}.</Box>
+                                <Box sx={{ width: 260, fontWeight: 700 }}>
+                                  {owner?.fullName ?? a.contactName ?? "—"}
+                                </Box>
+                                <Box sx={{ flex: 1 }}>{fmtApptWhen(a)}</Box>
+                                <Box sx={{ width: 190, textAlign: "right" }}>
+                                  <Button
+                                    variant="text"
+                                    onClick={() => openDetails(a)}
+                                    sx={{ textTransform: "none" }}
+                                  >
+                                    Προβολή λεπτομερειών
+                                  </Button>
+                                </Box>
+                              </Stack>
+                            );
+                          })}
                         </Stack>
                       </Box>
                     )}
@@ -488,48 +619,43 @@ export default function VetAppointments() {
                       <Box sx={{ px: { xs: 0, md: 1 } }}>
                         <Stack
                           direction="row"
-                          sx={{
-                            fontWeight: 900,
-                            color: "text.secondary",
-                            px: 1,
-                            mb: 1,
-                          }}
+                          sx={{ fontWeight: 900, color: "text.secondary", px: 1, mb: 1 }}
                         >
                           <Box sx={{ width: 56 }}>#</Box>
-                          <Box sx={{ width: 180 }}>Κωδικός</Box>
-                          <Box sx={{ flex: 1 }}>Ημερομηνία Ακύρωσης</Box>
+                          <Box sx={{ width: 260 }}>Ιδιοκτήτης</Box>
+                          <Box sx={{ flex: 1 }}>Ημερομηνία/Ώρα (ραντεβού)</Box>
                           <Box sx={{ width: 190, textAlign: "right" }} />
                         </Stack>
 
                         <Divider sx={{ mb: 1.5 }} />
 
                         <Stack spacing={1.2}>
-                          {rows.cancelled.map((a, i) => (
-                            <Stack
-                              key={a.id}
-                              direction="row"
-                              alignItems="center"
-                              sx={{
-                                bgcolor: "grey.50",
-                                borderRadius: 2,
-                                px: 1,
-                                py: 1.2,
-                              }}
-                            >
-                              <Box sx={{ width: 56, fontWeight: 800 }}>{i + 1}.</Box>
-                              <Box sx={{ width: 180, fontWeight: 700 }}>#{a.id}</Box>
-                              <Box sx={{ flex: 1 }}>{a.cancelledAt ?? a.updatedAt ?? a.date ?? "—"}</Box>
-                              <Box sx={{ width: 190, textAlign: "right" }}>
-                                <Button
-                                  variant="text"
-                                  onClick={() => openDetails(a)}
-                                  sx={{ textTransform: "none" }}
-                                >
-                                  Προβολή λεπτομερειών
-                                </Button>
-                              </Box>
-                            </Stack>
-                          ))}
+                          {rows.cancelled.map((a, i) => {
+                            const owner = userById.get(String(a.ownerId));
+                            return (
+                              <Stack
+                                key={a.id}
+                                direction="row"
+                                alignItems="center"
+                                sx={{ bgcolor: "grey.50", borderRadius: 2, px: 1, py: 1.2 }}
+                              >
+                                <Box sx={{ width: 56, fontWeight: 800 }}>{i + 1}.</Box>
+                                <Box sx={{ width: 260, fontWeight: 700 }}>
+                                  {owner?.fullName ?? a.contactName ?? "—"}
+                                </Box>
+                                <Box sx={{ flex: 1 }}>{fmtApptWhen(a)}</Box>
+                                <Box sx={{ width: 190, textAlign: "right" }}>
+                                  <Button
+                                    variant="text"
+                                    onClick={() => openDetails(a)}
+                                    sx={{ textTransform: "none" }}
+                                  >
+                                    Προβολή λεπτομερειών
+                                  </Button>
+                                </Box>
+                              </Stack>
+                            );
+                          })}
                         </Stack>
                       </Box>
                     )}
@@ -547,14 +673,10 @@ export default function VetAppointments() {
         <DialogContent dividers>
           {selectedAppt ? (
             <Stack spacing={1}>
-              <Stack direction="row" spacing={1} alignItems="center">
-                <Typography fontWeight={900}>Κωδικός:</Typography>
-                <Typography>#{selectedAppt.id}</Typography>
-              </Stack>
-
+              {/* Δεν δείχνουμε κωδικό πλέον */}
               <Stack direction="row" spacing={1} alignItems="center">
                 <Typography fontWeight={900}>Κατάσταση:</Typography>
-                <StatusChip status={selectedAppt.status} />
+                <StatusChip status={getEffectiveStatus(selectedAppt)} />
               </Stack>
 
               <Divider sx={{ my: 1 }} />
@@ -568,33 +690,39 @@ export default function VetAppointments() {
                       <b>Ζώο:</b> {pet?.name ?? "—"} ({pet?.species ?? "—"}) — microchip:{" "}
                       {pet?.microchip ?? "—"}
                     </Typography>
+
                     <Typography>
-                      <b>Ιδιοκτήτης:</b> {owner?.fullName ?? "—"}{" "}
-                      {owner?.phone ? `(${owner.phone})` : ""}
-                    </Typography>
-                    <Typography>
-                      <b>Ημερομηνία/Ώρα:</b> {selectedAppt.date ?? "—"}{" "}
-                      {selectedAppt.time ? `(${selectedAppt.time})` : ""}
-                    </Typography>
-                    <Typography>
-                      <b>Πράξη:</b> {selectedAppt.actType ?? "—"}
+                      <b>Ιδιοκτήτης:</b> {owner?.fullName ?? selectedAppt.contactName ?? "—"}{" "}
+                      {owner?.phone || selectedAppt.contactPhone
+                        ? `(${owner?.phone ?? selectedAppt.contactPhone})`
+                        : ""}
                     </Typography>
 
-                    {selectedAppt.cancelledBy && (
+                    <Typography>
+                      <b>Ημερομηνία/Ώρα:</b> {fmtApptWhen(selectedAppt)}
+                    </Typography>
+
+                    <Typography>
+                      <b>Πράξη:</b> {getActLabel(selectedAppt)}
+                    </Typography>
+
+                    {selectedAppt.cancelledBy ? (
                       <Typography color="text.secondary">
                         <b>Ακυρώθηκε από:</b> {selectedAppt.cancelledBy}
                       </Typography>
-                    )}
-                    {selectedAppt.cancelledAt && (
+                    ) : null}
+
+                    {selectedAppt.cancelledAt ? (
                       <Typography color="text.secondary">
-                        <b>Ημ/νία ακύρωσης:</b> {selectedAppt.cancelledAt}
+                        <b>Ημ/νία ακύρωσης:</b> {fmtIso(selectedAppt.cancelledAt)}
                       </Typography>
-                    )}
-                    {selectedAppt.completedAt && (
+                    ) : null}
+
+                    {selectedAppt.completedAt ? (
                       <Typography color="text.secondary">
-                        <b>Ολοκληρώθηκε:</b> {selectedAppt.completedAt}
+                        <b>Ολοκληρώθηκε:</b> {fmtIso(selectedAppt.completedAt)}
                       </Typography>
-                    )}
+                    ) : null}
                   </>
                 );
               })()}

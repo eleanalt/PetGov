@@ -24,6 +24,13 @@ import { api } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import Rating from "@mui/material/Rating";
 
+// ✅ DatePicker (MUI X)
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
+import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
+import Tooltip from "@mui/material/Tooltip";
+import { PickersDay } from "@mui/x-date-pickers/PickersDay";
+
 const steps = ["Στοιχεία Ιδιοκτήτη", "Στοιχεία Ζώου", "Επιβεβαίωση"];
 const SERVICES = ["Εμβόλιο", "Τακτικός Έλεγχος", "Στείρωση", "Καταγραφή Ζώου"];
 
@@ -70,14 +77,15 @@ function overlaps(aStart, aEnd, bStart, bEnd) {
   return aStart < bEnd && bStart < aEnd;
 }
 
-function buildSlotsForDay(dateStr, dayAvailability, takenIntervals, selectedDurationMin) {
+/** slots για ΕΝΑ block διαθεσιμότητας */
+function buildSlotsForBlock(dateStr, availabilityBlock, takenIntervals, selectedDurationMin) {
   if (!dateStr) return [];
-  if (!dayAvailability) return [];
-  if (dayAvailability.status && dayAvailability.status !== "open") return [];
+  if (!availabilityBlock) return [];
+  if (availabilityBlock.status && availabilityBlock.status !== "open") return [];
   if (!selectedDurationMin) return [];
 
-  const start = dayAvailability.startTime || "10:00";
-  const end = dayAvailability.endTime || "14:00";
+  const start = availabilityBlock.startTime || "10:00";
+  const end = availabilityBlock.endTime || "14:00";
 
   const startMin = toMinutes(start);
   const endMin = toMinutes(end);
@@ -100,6 +108,29 @@ function buildSlotsForDay(dateStr, dayAvailability, takenIntervals, selectedDura
   return out;
 }
 
+/** Union slots για ΠΟΛΛΑ blocks της ίδιας ημέρας */
+function buildSlotsForDay(dateStr, dayBlocks, takenIntervals, selectedDurationMin) {
+  if (!dateStr) return [];
+  if (!Array.isArray(dayBlocks) || dayBlocks.length === 0) return [];
+  if (!selectedDurationMin) return [];
+
+  const set = new Set();
+  dayBlocks.forEach((b) => {
+    const slots = buildSlotsForBlock(dateStr, b, takenIntervals, selectedDurationMin);
+    slots.forEach((s) => set.add(s));
+  });
+
+  return Array.from(set).sort((a, b) => toMinutes(a) - toMinutes(b));
+}
+
+function ymdFromDateObj(d) {
+  if (!d || Number.isNaN(d.getTime())) return "";
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 export default function OwnerAppointmentWizard() {
   const navigate = useNavigate();
   const { vetId } = useParams();
@@ -114,7 +145,6 @@ export default function OwnerAppointmentWizard() {
   const [availabilityList, setAvailabilityList] = useState([]);
   const [pets, setPets] = useState([]);
   const [vetAppointments, setVetAppointments] = useState([]);
-
   const [reviews, setReviews] = useState([]);
 
   const [form, setForm] = useState({
@@ -130,10 +160,8 @@ export default function OwnerAppointmentWizard() {
 
   const setField = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
-  // yyyy-mm-dd
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
-  // διάρκεια βάσει υπηρεσίας
   const selectedDuration = useMemo(() => {
     return SERVICE_DURATION_MINUTES[form.service] || DEFAULT_DURATION;
   }, [form.service]);
@@ -189,7 +217,6 @@ export default function OwnerAppointmentWizard() {
         const rRes = await api.get("/reviews");
         setReviews(Array.isArray(rRes.data) ? rRes.data : []);
       } catch (e) {
-
         setReviews([]);
       }
     })();
@@ -209,32 +236,30 @@ export default function OwnerAppointmentWizard() {
     return { avg: count ? sum / count : 0, count };
   }, [reviews, vetId]);
 
-  const maxAvailableDate = useMemo(() => {
-    const openDates = availabilityList
+  /** ✅ availability blocks grouped by date (μόνο open & >= today) */
+  const availabilityByDate = useMemo(() => {
+    const m = new Map();
+    (availabilityList || [])
       .filter((x) => (x.status ? x.status === "open" : true))
-      .map((x) => String(x.date))
-      .filter(Boolean)
-      .sort(); // yyyy-mm-dd
-    return openDates.length ? openDates[openDates.length - 1] : "";
-  }, [availabilityList]);
+      .filter((x) => String(x.date || "") >= today)
+      .forEach((x) => {
+        const key = String(x.date || "");
+        if (!key) return;
+        if (!m.has(key)) m.set(key, []);
+        m.get(key).push(x);
+      });
+    return m;
+  }, [availabilityList, today]);
 
-  const dayAvailability = useMemo(() => {
-    if (!form.date) return null;
-    return (
-      availabilityList.find(
-        (x) => String(x.date) === String(form.date) && (x.status ? x.status === "open" : true)
-      ) || null
-    );
-  }, [availabilityList, form.date]);
-
-  const takenIntervals = useMemo(() => {
-    const arr = [];
-    if (!form.date) return arr;
+  /** ✅ taken intervals grouped by date (pending/confirmed) */
+  const takenIntervalsByDate = useMemo(() => {
+    const m = new Map();
 
     (vetAppointments || [])
       .filter((a) => a && (a.status === "pending" || a.status === "confirmed"))
       .forEach((a) => {
-        if (dateKeyFromISO(a.datetime) !== form.date) return;
+        const day = dateKeyFromISO(a.datetime);
+        if (!day) return;
 
         const startHHMM = timeHHMMFromISO(a.datetime);
         if (!startHHMM) return;
@@ -243,20 +268,56 @@ export default function OwnerAppointmentWizard() {
         const dur = Number(a.durationMin) || SERVICE_DURATION_MINUTES[a.service] || DEFAULT_DURATION;
         const endMin = startMin + dur;
 
-        arr.push({ startMin, endMin });
+        if (!m.has(day)) m.set(day, []);
+        m.get(day).push({ startMin, endMin });
       });
 
-    return arr;
-  }, [vetAppointments, form.date]);
+    return m;
+  }, [vetAppointments]);
+
+  /** ✅ dates που έχουν ΟΝΤΩΣ διαθέσιμα slots (με βάση την επιλεγμένη υπηρεσία) */
+  const enabledDatesSet = useMemo(() => {
+    const set = new Set();
+    if (!form.service) return set;
+
+    for (const [dateStr, blocks] of availabilityByDate.entries()) {
+      const taken = takenIntervalsByDate.get(dateStr) || [];
+      const slots = buildSlotsForDay(dateStr, blocks, taken, selectedDuration);
+      if (slots.length > 0) set.add(dateStr);
+    }
+    return set;
+  }, [availabilityByDate, takenIntervalsByDate, form.service, selectedDuration]);
+
+  const maxEnabledDate = useMemo(() => {
+    const arr = Array.from(enabledDatesSet).sort();
+    return arr.length ? arr[arr.length - 1] : "";
+  }, [enabledDatesSet]);
+
+  const dayBlocks = useMemo(() => {
+    if (!form.date) return [];
+    return availabilityByDate.get(String(form.date)) || [];
+  }, [availabilityByDate, form.date]);
 
   const slots = useMemo(() => {
     if (!form.date || !form.service) return [];
-    return buildSlotsForDay(form.date, dayAvailability, takenIntervals, selectedDuration);
-  }, [form.date, form.service, dayAvailability, takenIntervals, selectedDuration]);
+    const taken = takenIntervalsByDate.get(String(form.date)) || [];
+    return buildSlotsForDay(form.date, dayBlocks, taken, selectedDuration);
+  }, [form.date, form.service, dayBlocks, takenIntervalsByDate, selectedDuration]);
 
   useEffect(() => {
-    if (!form.date) return;
-    if (form.date < today) setForm((f) => ({ ...f, date: today, time: "" }));
+    if (!form.service) {
+      setForm((f) => ({ ...f, date: "", time: "" }));
+      return;
+    }
+    if (form.date && !enabledDatesSet.has(String(form.date))) {
+      setForm((f) => ({ ...f, date: "", time: "" }));
+    }
+  }, [form.service, enabledDatesSet]);
+
+  // ✅ όταν αλλάξει date -> καθάρισε time
+  useEffect(() => {
+    setForm((f) => ({ ...f, time: "" }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.date]);
 
   const step1Valid = useMemo(
@@ -278,7 +339,9 @@ export default function OwnerAppointmentWizard() {
 
     return !arr.some((a) => {
       if (!(a.status === "pending" || a.status === "confirmed")) return false;
-      if (dateKeyFromISO(a.datetime) !== dateStr) return false;
+
+      const day = dateKeyFromISO(a.datetime);
+      if (day !== dateStr) return false;
 
       const s = toMinutes(timeHHMMFromISO(a.datetime));
       const d = Number(a.durationMin) || SERVICE_DURATION_MINUTES[a.service] || DEFAULT_DURATION;
@@ -297,8 +360,12 @@ export default function OwnerAppointmentWizard() {
       return;
     }
 
-    if (!dayAvailability) {
-      setMsg({ type: "error", text: "Δεν υπάρχει διαθεσιμότητα για αυτή την ημερομηνία." });
+    if (!enabledDatesSet.has(String(form.date))) {
+      setMsg({ type: "error", text: "Η ημερομηνία δεν είναι διαθέσιμη. Διάλεξε άλλη." });
+      return;
+    }
+    if (!slots.includes(form.time)) {
+      setMsg({ type: "error", text: "Η ώρα δεν είναι διαθέσιμη. Διάλεξε άλλη." });
       return;
     }
 
@@ -344,6 +411,38 @@ export default function OwnerAppointmentWizard() {
     }
   };
 
+  // ✅ renderDay με Tooltip + grey disabled
+  const renderDay = (day, _selectedDays, pickersDayProps) => {
+    const ymd = ymdFromDateObj(day);
+    const isEnabled = !!ymd && enabledDatesSet.has(ymd);
+
+    const disabled = pickersDayProps.disabled || !isEnabled;
+
+    const label = disabled && form.service ? "Δεν υπάρχει διαθέσιμο slot" : "";
+
+    return (
+      <Tooltip
+        key={pickersDayProps.key}
+        title={label}
+        arrow
+        disableHoverListener={!label}
+      >
+        <span>
+          <PickersDay
+            {...pickersDayProps}
+            disabled={disabled}
+            sx={{
+              ...(pickersDayProps.sx || {}),
+              ...(disabled
+                ? { opacity: 0.35, filter: "grayscale(1)" }
+                : {}),
+            }}
+          />
+        </span>
+      </Tooltip>
+    );
+  };
+
   return (
     <Box sx={{ bgcolor: "grey.100", minHeight: "calc(100vh - 76px)", py: 4 }}>
       <Container maxWidth="md">
@@ -361,7 +460,6 @@ export default function OwnerAppointmentWizard() {
               Ραντεβού Με Κτηνίατρο
             </Typography>
 
-            {/* ⭐ Rating του κτηνιάτρου (αν υπάρχει) */}
             <Stack direction="row" justifyContent="center" alignItems="center" spacing={1} sx={{ mb: 2 }}>
               <Rating value={vetRating.avg} precision={0.5} readOnly />
               <Typography color="text.secondary">({vetRating.count})</Typography>
@@ -463,7 +561,14 @@ export default function OwnerAppointmentWizard() {
                       labelId="svc-label"
                       label="* Υπηρεσία"
                       value={form.service}
-                      onChange={(e) => setForm((f) => ({ ...f, service: e.target.value, time: "" }))}
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          service: e.target.value,
+                          date: "",
+                          time: "",
+                        }))
+                      }
                     >
                       {SERVICES.map((s) => (
                         <MenuItem key={s} value={s}>
@@ -473,39 +578,50 @@ export default function OwnerAppointmentWizard() {
                     </Select>
                   </FormControl>
 
-                  <TextField
-                    label="* Ημερομηνία"
-                    type="date"
-                    value={form.date}
-                    onChange={(e) => {
-                      const v = e.target.value; // yyyy-mm-dd
-                      if (v && v < today) {
-                        setForm((f) => ({ ...f, date: today, time: "" }));
-                        return;
-                      }
-                      if (v && maxAvailableDate && v > maxAvailableDate) {
-                        setForm((f) => ({ ...f, date: maxAvailableDate, time: "" }));
-                        return;
-                      }
-                      setForm((f) => ({ ...f, date: v, time: "" }));
-                    }}
-                    InputLabelProps={{ shrink: true }}
-                    inputProps={{
-                      min: today,
-                      ...(maxAvailableDate ? { max: maxAvailableDate } : {}),
-                    }}
-                    fullWidth
-                  />
-
-                  {form.date && !dayAvailability && (
-                    <Alert severity="warning">
-                      Δεν υπάρχει διαθεσιμότητα για {form.date}. Διάλεξε άλλη ημερομηνία.
+                  {!form.service && (
+                    <Alert severity="info">
+                      Διάλεξε πρώτα υπηρεσία για να εμφανιστούν μόνο οι διαθέσιμες ημερομηνίες.
                     </Alert>
                   )}
 
-                  {!form.service && (
-                    <Alert severity="info">Διάλεξε πρώτα υπηρεσία για να υπολογιστεί η διάρκεια.</Alert>
-                  )}
+                  {/* ✅ DatePicker with only enabled dates */}
+                  <LocalizationProvider dateAdapter={AdapterDateFns}>
+                    <DatePicker
+                      label="* Ημερομηνία"
+                      value={form.date ? new Date(`${form.date}T00:00:00`) : null}
+                      onChange={(newValue) => {
+                        const ymd = ymdFromDateObj(newValue);
+                        setForm((f) => ({ ...f, date: ymd, time: "" }));
+                      }}
+                      disablePast
+                      minDate={new Date(`${today}T00:00:00`)}
+                      maxDate={maxEnabledDate ? new Date(`${maxEnabledDate}T00:00:00`) : undefined}
+                      disabled={!form.service || enabledDatesSet.size === 0}
+                      shouldDisableDate={(dateObj) => {
+                        if (!form.service) return true;
+                        const ymd = ymdFromDateObj(dateObj);
+                        if (!ymd) return true;
+                        return !enabledDatesSet.has(ymd);
+                      }}
+                      slots={{
+                        day: (props) => renderDay(props.day, null, props),
+                      }}
+                      slotProps={{
+                        textField: { fullWidth: true },
+                      }}
+                    />
+                  </LocalizationProvider>
+
+                  {/* ✅ counter + warning */}
+                  {form.service && enabledDatesSet.size > 0 ? (
+                    <Typography variant="caption" color="text.secondary">
+                      Διαθέσιμες ημερομηνίες: <b>{enabledDatesSet.size}</b>
+                    </Typography>
+                  ) : form.service ? (
+                    <Alert severity="warning">
+                      Δεν υπάρχουν διαθέσιμες ημερομηνίες για αυτή την υπηρεσία.
+                    </Alert>
+                  ) : null}
 
                   <FormControl fullWidth>
                     <InputLabel id="time-label">* Επιλογή Ώρας</InputLabel>
@@ -514,15 +630,11 @@ export default function OwnerAppointmentWizard() {
                       label="* Επιλογή Ώρας"
                       value={form.time}
                       onChange={setField("time")}
-                      disabled={!form.date || !form.service || !dayAvailability || slots.length === 0}
+                      disabled={!form.date || !form.service || slots.length === 0}
                     >
                       {!form.date ? (
                         <MenuItem value="" disabled>
                           Διάλεξε ημερομηνία
-                        </MenuItem>
-                      ) : !form.service ? (
-                        <MenuItem value="" disabled>
-                          Διάλεξε υπηρεσία
                         </MenuItem>
                       ) : slots.length === 0 ? (
                         <MenuItem value="" disabled>

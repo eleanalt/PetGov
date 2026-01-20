@@ -111,48 +111,6 @@ export default function AuthShell({ children, mode }) {
           </CardContent>
         </Card>
       </Box>
-
-      {/* Footer like the mockups */}
-      <Box sx={{ maxWidth: 980, mx: "auto", mt: 5 }}>
-        <Divider sx={{ mb: 2 }} />
-        <Grid container spacing={2} alignItems="center">
-          <Grid item xs={12} md={4}>
-            <Typography variant="caption" fontWeight={700}>
-              Επικοινωνία:
-            </Typography>
-            <Typography variant="caption" color="text.secondary" display="block">
-              210XXXXXXX
-            </Typography>
-            <Typography variant="caption" color="text.secondary" display="block">
-              210XXXXXXX
-            </Typography>
-          </Grid>
-
-          <Grid item xs={12} md={4} sx={{ textAlign: "center" }}>
-            <Typography variant="caption" color="text.secondary">
-              pet.gov
-            </Typography>
-          </Grid>
-
-          <Grid item xs={12} md={4} sx={{ textAlign: { xs: "left", md: "right" } }}>
-            <Button
-              variant="text"
-              sx={{ textTransform: "none", px: 0 }}
-              onClick={() => alert("Placeholder: Όροι χρήσης")}
-            >
-              Όροι χρήσης
-            </Button>
-          </Grid>
-        </Grid>
-
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{ display: "block", mt: 1, textAlign: "center" }}
-        >
-          Copyright 2025 • pet.gov
-        </Typography>
-      </Box>
     </Box>
   );
 }

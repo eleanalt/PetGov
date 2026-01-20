@@ -9,7 +9,7 @@ const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:3001";
 
 export default function Login() {
   const navigate = useNavigate();
-  const { login } = useAuth(); // αν στο AuthContext σου λέγεται αλλιώς, άλλαξέ το
+  const { login } = useAuth();
 
   const [email, setEmail] = useState("maria@demo.gr");
   const [password, setPassword] = useState("1234");
@@ -23,23 +23,20 @@ export default function Login() {
 
     try {
       const res = await axios.get(`${API_BASE}/users`, {
-        params: { email: email.trim(), password: password.trim() }
+        params: { email: email.trim(), password: password.trim() },
       });
 
       const user = Array.isArray(res.data) ? res.data[0] : null;
       if (!user) {
         setError("Λάθος email ή κωδικός.");
-        setLoading(false);
         return;
       }
 
-      // αν έχεις δικό σου login(), κράτα το
+      // κρατάμε το login στο context (και συνήθως γράφει και localStorage)
       if (typeof login === "function") login(user);
 
-      // redirect ανά ρόλο (προσαρμόζεις αν θες)
-      if (user.role === "vet") navigate("/vet");
-      else if (user.role === "owner") navigate("/owner");
-      else navigate("/");
+      // ✅ ΠΑΝΤΑ στην κανονική αρχική
+      navigate("/", { replace: true });
     } catch {
       setError("Δεν είναι διαθέσιμος ο server (JSON Server στο 3001).");
     } finally {
