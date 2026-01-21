@@ -35,7 +35,7 @@ function readFileAsDataURL(file) {
 export default function VetHealthBook() {
   const navigate = useNavigate();
   const { petId } = useParams();
-  const { user } = useAuth(); // ✅ για να ξέρουμε ότι είναι vet
+  const { user } = useAuth(); 
   const fileRef = useRef(null);
 
   const [pet, setPet] = useState(null);
@@ -106,7 +106,6 @@ export default function VetHealthBook() {
     try {
       const dataUrl = await readFileAsDataURL(file);
 
-      // ✅ αποθήκευση στο pet record
       const res = await api.patch(`/pets/${pet.id}`, { photoDataUrl: dataUrl });
 
       setPet(res.data ?? { ...pet, photoDataUrl: dataUrl });
@@ -174,7 +173,6 @@ export default function VetHealthBook() {
                   <Typography><b>Ημερομηνία Γέννησης:</b> {pet.birthDate || "—"}</Typography>
                   <Typography><b>Φύλο:</b> {pet.sex || "—"}</Typography>
                   <Typography><b>Ράτσα:</b> {pet.breed || "—"}</Typography>
-                  <Typography><b>Χρώμα:</b> {pet.color || "—"}</Typography>
                   <Typography sx={{ gridColumn: "1 / -1" }}>
                     <b>Ιδιοκτήτης:</b> {owner?.fullName || "—"}
                   </Typography>

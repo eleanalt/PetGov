@@ -21,18 +21,16 @@ import { api } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 
 const STATUS_LABEL = {
-  draft: { label: "Πρόχειρη", color: "default" },
+  draft: { label: "ΠΡΟΧΕΙΡΗ", color: "default" },
   submitted: { label: "ΑΝΟΙΧΤΗ", color: "warning" },
   found: { label: "ΒΡΕΘΗΚΕ", color: "success" },
-  cancelled: { label: "Ακυρωμένη", color: "error" },
+  cancelled: { label: "ΑΚΥΡΩΘΗΚΕ", color: "error" },
 };
 
-// βοηθάει για “πιο πρόσφατο”
 function sortByCreatedAtDesc(a, b) {
   return String(b?.createdAt || b?.date || "").localeCompare(String(a?.createdAt || a?.date || ""));
 }
 
-// ✅ 0544 -> 544
 function normId(x) {
   const s = String(x ?? "");
   const t = s.replace(/^0+/, "");
@@ -61,7 +59,6 @@ export default function OwnerLost() {
       });
       const reportsArr = Array.isArray(fr.data) ? fr.data : [];
 
-      // ✅ κρατά μόνο αναφορές που αφορούν δικά σου lostPets (με normId)
       const myLostIds = new Set(lostArr.map((x) => normId(x.id)));
       const onlyMine = reportsArr.filter((r) => myLostIds.has(normId(r.lostPetId)));
 
@@ -71,10 +68,6 @@ export default function OwnerLost() {
 
   const latestLost = useMemo(() => lost.slice(0, 5), [lost]);
 
-  /**
-   * ✅ Map: lostPetId -> πιο πρόσφατη αναφορά (μη-rejected)
-   * (με normId για να “κολλάει” πάντα)
-   */
   const latestReportByLostId = useMemo(() => {
     const m = new Map();
     (foundReports || [])
@@ -87,18 +80,12 @@ export default function OwnerLost() {
     return m;
   }, [foundReports]);
 
-  /**
-   * ✅ Κάτω table: ΟΛΕΣ οι αναφορές (μη-rejected)
-   */
   const allReportsForTable = useMemo(() => {
     return (foundReports || [])
       .filter((r) => r && r.status !== "rejected")
       .sort(sortByCreatedAtDesc);
   }, [foundReports]);
 
-  /**
-   * ✅ Set με IDs “πιο πρόσφατων” αναφορών
-   */
   const latestReportIdSet = useMemo(() => {
     const s = new Set();
     for (const r of latestReportByLostId.values()) {

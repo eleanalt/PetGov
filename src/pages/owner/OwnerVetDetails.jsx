@@ -10,6 +10,7 @@ import {
   Typography,
   Breadcrumbs,
   Link as MLink,
+  Avatar, 
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import Rating from "@mui/material/Rating";
@@ -37,7 +38,6 @@ export default function OwnerVetDetails() {
       try {
         const [vRes, rRes, uRes] = await Promise.all([
           api.get(`/users/${vetId}`),
-          // αν το json-server σου υποστηρίζει params:
           api.get("/reviews", { params: { vetId: String(vetId) } }).catch(() => api.get("/reviews")),
           api.get("/users"),
         ]);
@@ -45,7 +45,6 @@ export default function OwnerVetDetails() {
         setVet(vRes.data || null);
 
         const allReviews = Array.isArray(rRes.data) ? rRes.data : [];
-        // fallback φίλτρο αν το params δεν έπιασε:
         const mine = allReviews.filter((r) => String(r?.vetId) === String(vetId));
         setReviews(mine);
 
@@ -78,19 +77,20 @@ export default function OwnerVetDetails() {
   const avgRating = useMemo(() => avg(reviewsSorted.map((r) => Number(r.rating || 0))), [reviewsSorted]);
   const count = reviewsSorted.length;
 
+  const initials = useMemo(() => {
+    const name = (vet?.fullName || "Κ").trim();
+    return name
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((x) => x[0]?.toUpperCase())
+      .join("");
+  }, [vet?.fullName]);
+
   return (
     <Box sx={{ bgcolor: "grey.100", minHeight: "calc(100vh - 76px)", py: 4 }}>
       <Container maxWidth="lg">
-        <Breadcrumbs sx={{ color: "text.secondary", mb: 1 }}>
-          <MLink component={RouterLink} to="/" underline="hover" color="inherit">
-            Αρχική
-          </MLink>
-          <MLink component={RouterLink} to="/owner/appointments" underline="hover" color="inherit">
-            Τα ραντεβού μου
-          </MLink>
-          <Typography color="text.primary">Κτηνίατρος</Typography>
-        </Breadcrumbs>
-
+      
         <Button
           startIcon={<ArrowBackIcon />}
           onClick={() => navigate(-1)}
@@ -109,14 +109,46 @@ export default function OwnerVetDetails() {
               <Typography color="text.secondary">Φόρτωση...</Typography>
             ) : (
               <Stack direction={{ xs: "column", md: "row" }} spacing={3}>
+             
                 <Box
                   sx={{
                     width: { xs: "100%", md: 360 },
                     height: 220,
-                    bgcolor: "grey.200",
                     borderRadius: 3,
+                    overflow: "hidden",
+                    bgcolor: "grey.200",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
                   }}
-                />
+                >
+                  {vet?.avatarDataUrl ? (
+                    <Box
+                      component="img"
+                      src={vet.avatarDataUrl}
+                      alt={vet?.fullName || "Κτηνίατρος"}
+                      sx={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                        display: "block",
+                      }}
+                    />
+                  ) : (
+                    <Avatar
+                      sx={{
+                        width: 96,
+                        height: 96,
+                        fontSize: 34,
+                        fontWeight: 900,
+                        bgcolor: "grey.300",
+                        color: "text.primary",
+                      }}
+                    >
+                      {initials}
+                    </Avatar>
+                  )}
+                </Box>
 
                 <Box sx={{ flex: 1 }}>
                   <Typography variant="h5" fontWeight={900}>
@@ -150,16 +182,15 @@ export default function OwnerVetDetails() {
 
                     <Box sx={{ flex: 1 }} />
 
-                    {/* ✅ ΣΩΣΤΟ route για wizard (εσύ το έχεις ως /owner/appointments/new/:vetId) */}
                     <Button
                       variant="contained"
                       onClick={() => navigate(`/owner/appointments/new/${vetId}`)}
                       sx={{
                         textTransform: "none",
                         borderRadius: 2,
-                        bgcolor: "grey.700",
+                        bgcolor: "success.main",
                         px: 3,
-                        "&:hover": { bgcolor: "grey.800" },
+                        "&:hover": { bgcolor: "success.dark" },
                       }}
                     >
                       Κλείσε ραντεβού
@@ -216,9 +247,7 @@ export default function OwnerVetDetails() {
                         <Typography color="text.secondary">{dateStr}</Typography>
                       </Stack>
 
-                      <Typography sx={{ mt: 1 }}>
-                        {r.text || r.comment || "—"}
-                      </Typography>
+                      <Typography sx={{ mt: 1 }}>{r.text || r.comment || "—"}</Typography>
                     </Box>
                   );
                 })}

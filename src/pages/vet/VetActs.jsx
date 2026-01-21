@@ -103,7 +103,8 @@ export default function VetActs() {
     <Box sx={{ bgcolor: "grey.100", minHeight: "calc(100vh - 76px)", py: 4 }}>
       <Container maxWidth="lg">
         <Stack spacing={2}>
-
+          
+         
           <Button
             startIcon={<ArrowBackIcon />}
             onClick={() => navigate(-1)}
@@ -118,28 +119,24 @@ export default function VetActs() {
 
           <Box sx={{ display: "flex", justifyContent: "center", mt: 1 }}>
             <TextField
-  value={microchip}
-  onChange={(e) => {
-    setMicrochip(e.target.value);
-    setError("");
-    setSearched(false);
-    setPet(null);
-    setOwner(null);
-  }}
-  placeholder="Αναζήτηση με αριθμό μικροτσιπ..."
-  sx={{ width: "min(720px, 100%)" }}
-  helperText={
-    "Συμπληρώστε τον αριθμό microchip και πατήστε «Αναζήτηση» για εμφάνιση στοιχείων ή «Νέα Πράξη» για δημιουργία πράξης."
-  }
-  FormHelperTextProps={{ sx: { textAlign: "center" } }}
-  InputProps={{
-    startAdornment: (
-      <InputAdornment position="start">
-        <SearchIcon />
-      </InputAdornment>
-    ),
-  }}
-/>
+              value={microchip}
+              onChange={(e) => {
+                setMicrochip(e.target.value);
+                setError("");
+                setSearched(false);
+                setPet(null);
+                setOwner(null);
+              }}
+              placeholder="Αναζήτηση με αριθμό μικροτσιπ..."
+              sx={{ width: "min(720px, 100%)" }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>
+                ),
+              }}
+            />
           </Box>
 
           {/* Buttons */}
@@ -159,14 +156,13 @@ export default function VetActs() {
                 onClick={onNewAct}
                 disabled={loading}
                 sx={{
-  textTransform: "none",
-  fontWeight: 900,
-  px: 5,
-  borderRadius: 2,
-  bgcolor: "success.main",
-  "&:hover": { bgcolor: "success.dark" },
-}}
-
+                  textTransform: "none",
+                  fontWeight: 900,
+                  px: 5,
+                  borderRadius: 2,
+                  bgcolor: "success.main",
+                  "&:hover": { bgcolor: "success.main" },
+                }}
               >
                 Νέα Πράξη
               </Button>
@@ -231,7 +227,7 @@ export default function VetActs() {
                     <Button
                       variant="contained"
                       onClick={() => navigate(`/vet/acts/healthbook/${pet.id}`)}
-                      sx={{ textTransform: "none", borderRadius: 2, px: 4, bgcolor: "primary" }}
+                      sx={{ textTransform: "none", borderRadius: 2, px: 4, bgcolor: "grey.700" }}
                     >
                       Προβολή Βιβλιαρίου
                     </Button>
@@ -239,7 +235,7 @@ export default function VetActs() {
                     <Button
                       variant="contained"
                       onClick={() => navigate(`/vet/acts/history/${pet.id}`)}
-                      sx={{ textTransform: "none", borderRadius: 2, px: 4, bgcolor: "primary" }}
+                      sx={{ textTransform: "none", borderRadius: 2, px: 4, bgcolor: "grey.700" }}
                     >
                       Προβολή Ιστορικού
                     </Button>
@@ -248,9 +244,8 @@ export default function VetActs() {
                   <Box sx={{ display: "flex", justifyContent: "center", mt: 2 }}>
                     <Button
                       variant="contained"
-                      color="success"
                       onClick={() => navigate(`/vet/acts/new/${pet.id}`)}
-                      sx={{ textTransform: "none", borderRadius: 2, px: 6 }}
+                      sx={{ textTransform: "none", borderRadius: 2, px: 6, bgcolor: "success.main" }}
                     >
                       Νέα Πράξη
                     </Button>

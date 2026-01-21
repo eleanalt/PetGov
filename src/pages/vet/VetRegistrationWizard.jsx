@@ -14,11 +14,9 @@ import {
   Stepper,
   TextField,
   Typography,
-  Breadcrumbs,
-  Link as MUILink,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 
@@ -50,6 +48,25 @@ async function findPetByMicrochip(microchip) {
   return arr[0] || null;
 }
 
+async function findOpenLostByPetId(petId) {
+  if (!petId) return null;
+  const res = await api.get("/lostPets", {
+    params: { petId: String(petId), status: "submitted" },
+  });
+  const arr = Array.isArray(res.data) ? res.data : [];
+  return arr[0] || null;
+}
+
+
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result || ""));
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+
 export default function VetRegistrationWizard() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -69,14 +86,77 @@ export default function VetRegistrationWizard() {
     birthDate: "",
     lifeEvent: "",
     ownerAfm: "",
+
+    lossPhoto: null,
+    lossArea: "",
+    lossDetails: "",
   });
 
-  // ✅ microchip auto-fill
   const [petLookupLoading, setPetLookupLoading] = useState(false);
   const [autoFilled, setAutoFilled] = useState(false);
 
+  const [errors, setErrors] = useState({});
+  const [touched, setTouched] = useState({});
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+
   const showMsg = (type, text) => setPageMsg({ type, text });
   const clearMsg = () => setPageMsg(null);
+
+  const markTouched = (key) => () => setTouched((t) => ({ ...t, [key]: true }));
+
+  const setField = (key) => (e) => {
+    clearMsg();
+    const value = e.target.value;
+
+    setForm((f) => {
+      const next = { ...f, [key]: value };
+
+      // αν αλλάξει από Απώλεια σε κάτι άλλο, καθάρισε τα loss fields
+      if (key === "lifeEvent" && value !== "Απώλεια") {
+        next.lossPhoto = null;
+        next.lossArea = "";
+        next.lossDetails = "";
+      }
+
+      return next;
+    });
+  };
+
+  const needsAfm = isAdoptionOrFoster(form.lifeEvent);
+  const isLoss = form.lifeEvent === "Απώλεια";
+  const pageTitle = regId ? "Επεξεργασία καταγραφής" : "Νέα καταγραφή";
+
+  function validateForm(f) {
+    const e = {};
+    const req = (k, msg = "Υποχρεωτικό πεδίο") => {
+      if (!String(f[k] || "").trim()) e[k] = msg;
+    };
+
+    req("microchip");
+    req("species");
+    req("sex");
+    req("name");
+    req("birthDate");
+    req("lifeEvent");
+
+    if (isAdoptionOrFoster(f.lifeEvent)) {
+      if (!onlyDigits(f.ownerAfm)) e.ownerAfm = "Υποχρεωτικό πεδίο";
+    }
+
+    if (f.lifeEvent === "Απώλεια") {
+      if (!f.lossPhoto) e.lossPhoto = "Υποχρεωτική φωτογραφία για δήλωση απώλειας";
+      if (!String(f.lossArea || "").trim()) e.lossArea = "Υποχρεωτική περιοχή απώλειας";
+    }
+
+    // microchip μόνο αριθμοί
+    if (String(f.microchip || "").trim() && !onlyDigits(f.microchip)) {
+      e.microchip = "Το microchip πρέπει να είναι μόνο αριθμοί";
+    }
+
+    return e;
+  }
+
+  const shouldShowError = (key) => Boolean(errors?.[key]) && (touched?.[key] || submitAttempted);
 
   // Load existing registration if editing
   useEffect(() => {
@@ -85,7 +165,7 @@ export default function VetRegistrationWizard() {
       try {
         const res = await api.get(`/petRegistrations/${regId}`);
         if (res?.data) {
-          setForm({
+          const next = {
             microchip: res.data.microchip ?? "",
             species: res.data.species ?? "",
             sex: res.data.sex ?? "",
@@ -93,8 +173,13 @@ export default function VetRegistrationWizard() {
             birthDate: res.data.birthDate ?? "",
             lifeEvent: res.data.lifeEvent ?? "",
             ownerAfm: res.data.ownerAfm ?? "",
-          });
 
+            lossPhoto: null,
+            lossArea: res.data.lossArea ?? "",
+            lossDetails: res.data.lossDetails ?? "",
+          };
+          setForm(next);
+          setErrors(validateForm(next));
           setStep(res.data.status === "submitted" ? 2 : 1);
         }
       } catch (e) {
@@ -102,15 +187,8 @@ export default function VetRegistrationWizard() {
         showMsg("error", "Δεν βρέθηκε η καταγραφή.");
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [regId]);
 
-  const setField = (key) => (e) => {
-    clearMsg();
-    setForm((f) => ({ ...f, [key]: e.target.value }));
-  };
-
-  // ✅ Auto-fill από /pets όταν υπάρχει microchip
   useEffect(() => {
     let cancelled = false;
 
@@ -130,14 +208,16 @@ export default function VetRegistrationWizard() {
         if (cancelled) return;
 
         if (pet?.id) {
-          setForm((f) => ({
-            ...f,
+          const next = {
+            ...form,
             microchip: mc,
-            species: pet.species ?? f.species ?? "",
-            sex: pet.sex ?? pet.gender ?? f.sex ?? "",
-            name: pet.name ?? f.name ?? "",
-            birthDate: pet.birthDate ?? f.birthDate ?? "",
-          }));
+            species: pet.species ?? form.species ?? "",
+            sex: pet.sex ?? pet.gender ?? form.sex ?? "",
+            name: pet.name ?? form.name ?? "",
+            birthDate: pet.birthDate ?? form.birthDate ?? "",
+          };
+          setForm(next);
+          setErrors(validateForm(next));
           setAutoFilled(true);
         } else {
           setAutoFilled(false);
@@ -153,18 +233,8 @@ export default function VetRegistrationWizard() {
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.microchip, regId]);
-
-  const isValid = useMemo(() => {
-    if (!onlyDigits(form.microchip)) return false;
-    if (!form.species) return false;
-    if (!form.sex) return false;
-    if (!form.lifeEvent) return false;
-
-    if (isAdoptionOrFoster(form.lifeEvent) && !onlyDigits(form.ownerAfm)) return false;
-
-    return true;
-  }, [form]);
 
   const previewRows = useMemo(() => {
     const rows = [
@@ -176,30 +246,46 @@ export default function VetRegistrationWizard() {
       { label: "Συμβάν ζωής", value: form.lifeEvent || "—" },
     ];
 
-    if (isAdoptionOrFoster(form.lifeEvent)) {
-      rows.push({ label: "ΑΦΜ Ιδιοκτήτη", value: form.ownerAfm || "—" });
+    if (needsAfm) rows.push({ label: "ΑΦΜ Ιδιοκτήτη", value: form.ownerAfm || "—" });
+
+    if (isLoss) {
+      rows.push({ label: "Περιοχή απώλειας", value: form.lossArea || "—" });
+      rows.push({ label: "Λεπτομέρειες", value: form.lossDetails || "—" });
+      rows.push({ label: "Φωτογραφία", value: form.lossPhoto?.name || "—" });
     }
 
     return rows;
-  }, [form]);
+  }, [form, needsAfm, isLoss]);
 
   const ensureAuthAndValid = () => {
-    if (!onlyDigits(form.microchip)) {
-      showMsg("error", "Το μικροτσίπ είναι υποχρεωτικό.");
-      return false;
-    }
-    if (!form.species || !form.sex || !form.lifeEvent) {
-      showMsg("error", "Συμπλήρωσε τα υποχρεωτικά πεδία (*).");
-      return false;
-    }
-    if (isAdoptionOrFoster(form.lifeEvent) && !onlyDigits(form.ownerAfm)) {
-      showMsg("error", "Για Υιοθεσία/Αναδοχή/Μεταβίβαση το ΑΦΜ ιδιοκτήτη είναι υποχρεωτικό.");
-      return false;
-    }
     if (!user?.id) {
       showMsg("error", "Δεν βρέθηκε συνδεδεμένος χρήστης.");
       return false;
     }
+
+    const e = validateForm(form);
+    setErrors(e);
+    setSubmitAttempted(true);
+
+    setTouched((t) => ({
+      ...t,
+      microchip: true,
+      species: true,
+      sex: true,
+      name: true,
+      birthDate: true,
+      lifeEvent: true,
+      ownerAfm: true,
+      lossPhoto: true,
+      lossArea: true,
+      lossDetails: true,
+    }));
+
+    if (Object.keys(e).length > 0) {
+      showMsg("error", "Συμπλήρωσε όλα τα υποχρεωτικά πεδία.");
+      return false;
+    }
+
     return true;
   };
 
@@ -210,7 +296,7 @@ export default function VetRegistrationWizard() {
     setSaving(true);
     try {
       let owner = null;
-      if (isAdoptionOrFoster(form.lifeEvent)) {
+      if (needsAfm) {
         owner = await findOwnerByAfm(form.ownerAfm);
         if (!owner?.id) {
           showMsg("error", "Δεν βρέθηκε ιδιοκτήτης με αυτό το ΑΦΜ.");
@@ -222,7 +308,7 @@ export default function VetRegistrationWizard() {
       const payload = {
         ...form,
         microchip: onlyDigits(form.microchip),
-        ownerAfm: isAdoptionOrFoster(form.lifeEvent) ? onlyDigits(form.ownerAfm) : "",
+        ownerAfm: needsAfm ? onlyDigits(form.ownerAfm) : "",
         ownerId: owner?.id ? String(owner.id) : "",
         vetUserId: String(user.id),
         status: "draft",
@@ -237,7 +323,6 @@ export default function VetRegistrationWizard() {
           ...payload,
           createdAt: new Date().toISOString(),
         });
-
         const newId = res?.data?.id;
         showMsg("success", "Έγινε προσωρινή αποθήκευση.");
         if (newId) navigate(`/vet/registrations/${newId}`, { replace: true });
@@ -259,7 +344,7 @@ export default function VetRegistrationWizard() {
     setSaving(true);
     try {
       let owner = null;
-      if (isAdoptionOrFoster(form.lifeEvent)) {
+      if (needsAfm) {
         owner = await findOwnerByAfm(form.ownerAfm);
         if (!owner?.id) {
           showMsg("error", "Δεν βρέθηκε ιδιοκτήτης με αυτό το ΑΦΜ.");
@@ -271,13 +356,14 @@ export default function VetRegistrationWizard() {
       const payload = {
         ...form,
         microchip: onlyDigits(form.microchip),
-        ownerAfm: isAdoptionOrFoster(form.lifeEvent) ? onlyDigits(form.ownerAfm) : "",
+        ownerAfm: needsAfm ? onlyDigits(form.ownerAfm) : "",
         ownerId: owner?.id ? String(owner.id) : "",
         vetUserId: String(user.id),
         status: "submitted",
         updatedAt: new Date().toISOString(),
       };
 
+      // 1) submit registration
       if (regId) {
         await api.patch(`/petRegistrations/${regId}`, payload);
       } else {
@@ -289,7 +375,8 @@ export default function VetRegistrationWizard() {
         if (newId) navigate(`/vet/registrations/${newId}`, { replace: true });
       }
 
-      if (isAdoptionOrFoster(form.lifeEvent) && owner?.id) {
+      // 2) Υιοθεσία/Αναδοχή/Μεταβίβαση -> ενημέρωσε /pets owner
+      if (needsAfm && owner?.id) {
         const microchip = onlyDigits(form.microchip);
         const existingPet = await findPetByMicrochip(microchip);
 
@@ -319,6 +406,69 @@ export default function VetRegistrationWizard() {
         }
       }
 
+      try {
+        const microchip = onlyDigits(form.microchip);
+        const pet = await findPetByMicrochip(microchip);
+
+        if (pet?.id) {
+          const petId = String(pet.id);
+          const ownerIdFromPet = pet.ownerId ? String(pet.ownerId) : "";
+
+          const snapshot = {
+            petId,
+            ownerId: ownerIdFromPet,
+            microchip: pet.microchip || microchip,
+            petName: pet.name || form.name || "",
+            species: pet.species || form.species || "",
+            sex: pet.sex || pet.gender || form.sex || "",
+          };
+
+          let lossPhotoDataUrl = "";
+          if (form.lifeEvent === "Απώλεια" && form.lossPhoto) {
+            lossPhotoDataUrl = await fileToDataUrl(form.lossPhoto);
+          }
+
+          if (form.lifeEvent === "Απώλεια") {
+            const existingLost = await findOpenLostByPetId(petId);
+
+            const patchPayload = {
+              ...snapshot,
+              status: "submitted",
+              lostDate: existingLost?.lostDate || new Date().toISOString().slice(0, 10),
+              area: form.lossArea,
+              details: form.lossDetails || "",
+              photos: lossPhotoDataUrl
+                ? [lossPhotoDataUrl]
+                : (existingLost?.photos || []),
+              updatedAt: new Date().toISOString(),
+            };
+
+            if (existingLost?.id) {
+              await api.patch(`/lostPets/${existingLost.id}`, patchPayload);
+            } else {
+              await api.post("/lostPets", {
+                ...patchPayload,
+                createdAt: new Date().toISOString(),
+              });
+            }
+          }
+
+          if (form.lifeEvent === "Εύρεση") {
+            const existingLost = await findOpenLostByPetId(petId);
+            if (existingLost?.id) {
+              await api.patch(`/lostPets/${existingLost.id}`, {
+                ...snapshot,
+                status: "found",
+                foundAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              });
+            }
+          }
+        }
+      } catch (e) {
+        console.error("lostPets sync failed", e);
+      }
+
       setSubmitted(true);
       showMsg("success", "Η καταγραφή υποβλήθηκε οριστικά.");
     } catch (e) {
@@ -329,12 +479,6 @@ export default function VetRegistrationWizard() {
     }
   };
 
-  const needsAfm = isAdoptionOrFoster(form.lifeEvent);
-
-  const pageTitle = regId ? "Επεξεργασία καταγραφής" : "Νέα καταγραφή";
-
-
-  // Success screen after submit
   if (submitted) {
     return (
       <Box sx={{ bgcolor: "grey.100", minHeight: "calc(100vh - 76px)", py: 4 }}>
@@ -393,7 +537,6 @@ export default function VetRegistrationWizard() {
   return (
     <Box sx={{ bgcolor: "grey.100", minHeight: "calc(100vh - 76px)", py: 4 }}>
       <Container maxWidth="lg">
-
         <Button
           startIcon={<ArrowBackIcon />}
           onClick={() => navigate("/vet/registrations")}
@@ -422,7 +565,6 @@ export default function VetRegistrationWizard() {
               ))}
             </Stepper>
 
-            {/* STEP 1: Form */}
             {step === 0 && (
               <Box sx={{ maxWidth: 560, mx: "auto" }}>
                 <Stack spacing={2}>
@@ -433,10 +575,15 @@ export default function VetRegistrationWizard() {
                       clearMsg();
                       setAutoFilled(false);
                       setForm((f) => ({ ...f, microchip: e.target.value }));
+                      setErrors((prev) => ({ ...prev, microchip: undefined }));
                     }}
+                    onBlur={markTouched("microchip")}
                     fullWidth
+                    error={shouldShowError("microchip")}
                     helperText={
-                      petLookupLoading
+                      shouldShowError("microchip")
+                        ? errors.microchip
+                        : petLookupLoading
                         ? "Αναζήτηση μικροτσίπ..."
                         : autoFilled
                         ? "Βρέθηκε κατοικίδιο — συμπληρώθηκαν αυτόματα τα στοιχεία."
@@ -449,12 +596,15 @@ export default function VetRegistrationWizard() {
                     label="* Είδος κατοικιδίου"
                     value={form.species}
                     onChange={setField("species")}
+                    onBlur={markTouched("species")}
                     fullWidth
                     disabled={autoFilled}
+                    error={shouldShowError("species")}
+                    helperText={shouldShowError("species") ? errors.species : " "}
                   >
                     <MenuItem value="Σκύλος">Σκύλος</MenuItem>
                     <MenuItem value="Γάτα">Γάτα</MenuItem>
-                    <MenuItem value="Άλλο">Άλλο</MenuItem>
+                    <MenuItem value="Κουνέλι">Κουνέλι</MenuItem>
                   </TextField>
 
                   <TextField
@@ -462,29 +612,38 @@ export default function VetRegistrationWizard() {
                     label="* Φύλο"
                     value={form.sex}
                     onChange={setField("sex")}
+                    onBlur={markTouched("sex")}
                     fullWidth
                     disabled={autoFilled}
+                    error={shouldShowError("sex")}
+                    helperText={shouldShowError("sex") ? errors.sex : " "}
                   >
                     <MenuItem value="Αρσενικό">Αρσενικό</MenuItem>
                     <MenuItem value="Θηλυκό">Θηλυκό</MenuItem>
                   </TextField>
 
                   <TextField
-                    label="Όνομα"
+                    label="* Όνομα"
                     value={form.name}
                     onChange={setField("name")}
+                    onBlur={markTouched("name")}
                     fullWidth
                     disabled={autoFilled}
+                    error={shouldShowError("name")}
+                    helperText={shouldShowError("name") ? errors.name : " "}
                   />
 
                   <TextField
-                    label="Ημερομηνία Γέννησης"
+                    label="* Ημερομηνία Γέννησης"
                     type="date"
                     value={form.birthDate}
                     onChange={setField("birthDate")}
+                    onBlur={markTouched("birthDate")}
                     fullWidth
                     InputLabelProps={{ shrink: true }}
                     disabled={autoFilled}
+                    error={shouldShowError("birthDate")}
+                    helperText={shouldShowError("birthDate") ? errors.birthDate : " "}
                   />
 
                   {autoFilled && (
@@ -502,7 +661,10 @@ export default function VetRegistrationWizard() {
                     label="* Συμβάν ζωής"
                     value={form.lifeEvent}
                     onChange={setField("lifeEvent")}
+                    onBlur={markTouched("lifeEvent")}
                     fullWidth
+                    error={shouldShowError("lifeEvent")}
+                    helperText={shouldShowError("lifeEvent") ? errors.lifeEvent : " "}
                   >
                     <MenuItem value="Απώλεια">Απώλεια</MenuItem>
                     <MenuItem value="Εύρεση">Εύρεση</MenuItem>
@@ -511,13 +673,97 @@ export default function VetRegistrationWizard() {
                     <MenuItem value="Αναδοχή">Αναδοχή</MenuItem>
                   </TextField>
 
+                  {isLoss && (
+                    <>
+                      <Box>
+                        <Button
+                          component="label"
+                          variant="outlined"
+                          fullWidth
+                          sx={{ textTransform: "none", borderRadius: 2, fontWeight: 900 }}
+                          color={shouldShowError("lossPhoto") ? "error" : "primary"}
+                        >
+                          {form.lossPhoto ? `Επιλεγμένη φωτο: ${form.lossPhoto.name}` : "* Ανέβασμα φωτογραφίας"}
+                          <input
+                            hidden
+                            type="file"
+                            accept="image/*"
+                            onBlur={markTouched("lossPhoto")}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0] || null;
+                              setForm((f) => ({ ...f, lossPhoto: file }));
+                              setErrors((prev) => ({ ...prev, lossPhoto: undefined }));
+                            }}
+                          />
+                        </Button>
+
+                        {shouldShowError("lossPhoto") ? (
+                          <Typography variant="caption" color="error">
+                            {errors.lossPhoto}
+                          </Typography>
+                        ) : (
+                          <Typography variant="caption" color="text.secondary">
+                            Υποχρεωτικό για δήλωση απώλειας
+                          </Typography>
+                        )}
+
+                        {form.lossPhoto && (
+                          <Box
+                            component="img"
+                            alt="preview"
+                            src={URL.createObjectURL(form.lossPhoto)}
+                            sx={{
+                              mt: 1,
+                              width: "100%",
+                              height: 180,
+                              objectFit: "cover",
+                              borderRadius: 2,
+                              border: "1px solid",
+                              borderColor: "divider",
+                            }}
+                          />
+                        )}
+                      </Box>
+
+                      <TextField
+                        label="* Περιοχή απώλειας"
+                        value={form.lossArea}
+                        onChange={(e) => {
+                          setForm((f) => ({ ...f, lossArea: e.target.value }));
+                          setErrors((prev) => ({ ...prev, lossArea: undefined }));
+                        }}
+                        onBlur={markTouched("lossArea")}
+                        fullWidth
+                        error={shouldShowError("lossArea")}
+                        helperText={shouldShowError("lossArea") ? errors.lossArea : " "}
+                      />
+
+                      <TextField
+                        label="Λεπτομέρειες (προαιρετικό)"
+                        value={form.lossDetails}
+                        onChange={(e) => setForm((f) => ({ ...f, lossDetails: e.target.value }))}
+                        onBlur={markTouched("lossDetails")}
+                        fullWidth
+                        multiline
+                        minRows={3}
+                        helperText=" "
+                      />
+                    </>
+                  )}
+
                   {needsAfm && (
                     <TextField
                       label="* ΑΦΜ Ιδιοκτήτη"
                       value={form.ownerAfm}
                       onChange={setField("ownerAfm")}
+                      onBlur={markTouched("ownerAfm")}
                       fullWidth
-                      helperText="Απαιτείται για Υιοθεσία/Αναδοχή/Μεταβίβαση"
+                      error={shouldShowError("ownerAfm")}
+                      helperText={
+                        shouldShowError("ownerAfm")
+                          ? errors.ownerAfm
+                          : "Απαιτείται για Υιοθεσία/Αναδοχή/Μεταβίβαση"
+                      }
                     />
                   )}
 
@@ -526,11 +772,34 @@ export default function VetRegistrationWizard() {
                       variant="contained"
                       onClick={() => {
                         clearMsg();
-                        if (!ensureAuthAndValid()) return;
+                        setSubmitAttempted(true);
+
+                        const e = validateForm(form);
+                        setErrors(e);
+
+                        setTouched((t) => ({
+                          ...t,
+                          microchip: true,
+                          species: true,
+                          sex: true,
+                          name: true,
+                          birthDate: true,
+                          lifeEvent: true,
+                          ownerAfm: true,
+                          lossPhoto: true,
+                          lossArea: true,
+                          lossDetails: true,
+                        }));
+
+                        if (Object.keys(e).length > 0) {
+                          showMsg("error", "Συμπλήρωσε όλα τα υποχρεωτικά πεδία.");
+                          return;
+                        }
+
                         setStep(1);
                       }}
                       sx={{ textTransform: "none", fontWeight: 900, borderRadius: 2, px: 4 }}
-                      disabled={!isValid}
+                      disabled={saving}
                     >
                       Συνέχεια
                     </Button>
@@ -543,7 +812,7 @@ export default function VetRegistrationWizard() {
               </Box>
             )}
 
-            {/* STEP 2: Preview + Draft */}
+            {/* STEP 2 */}
             {step === 1 && (
               <Box sx={{ maxWidth: 640, mx: "auto" }}>
                 <Card variant="outlined" sx={{ borderRadius: 2 }}>
@@ -597,11 +866,7 @@ export default function VetRegistrationWizard() {
                       </Stack>
                     </Stack>
 
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{ display: "block", mt: 1.5 }}
-                    >
+                    <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1.5 }}>
                       Τα πεδία με αστερίσκο (*) είναι υποχρεωτικά
                     </Typography>
                   </CardContent>

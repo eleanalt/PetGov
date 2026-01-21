@@ -98,7 +98,7 @@ export default function VetAvailability() {
                     borderRadius: 2,
                     px: 5,
                     fontWeight: 900,
-                    bgcolor: "grey.700",
+                    bgcolor: "success.main",
                   }}
                 >
                   Επεξεργασία Διαθεσιμότητας

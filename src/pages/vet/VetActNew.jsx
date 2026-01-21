@@ -149,13 +149,17 @@ export default function VetActNew() {
                   </TextField>
 
                   <TextField
-                    label="Ημερομηνία *"
-                    type="date"
-                    value={form.date}
-                    onChange={setField("date")}
-                    fullWidth
-                    InputLabelProps={{ shrink: true }}
-                  />
+  label="Ημερομηνία *"
+  type="date"
+  value={form.date}
+  onChange={setField("date")}
+  fullWidth
+  InputLabelProps={{ shrink: true }}
+  inputProps={{
+    max: new Date().toISOString().slice(0, 10), 
+  }}
+/>
+
 
                   <TextField
                     label="Σημειώσεις"

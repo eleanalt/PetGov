@@ -21,7 +21,7 @@ import {
   ROLE_LABELS,
   isAllowed,
   effectiveRole,
-  HEADER_ACTIONS, // ✅ πρόσθεσε αυτό
+  HEADER_ACTIONS, 
 } from "../routes/menuConfig";
 
 export default function AppLayout() {
@@ -36,7 +36,7 @@ export default function AppLayout() {
   );
 
   const dropdownItems = USER_MENU[role] ?? [];
-  const headerAction = HEADER_ACTIONS?.[role] ?? null; // ✅ Dashboard button config
+  const headerAction = HEADER_ACTIONS?.[role] ?? null; 
 
   const [anchorEl, setAnchorEl] = useState(null);
   const open = Boolean(anchorEl);
@@ -145,7 +145,6 @@ export default function AppLayout() {
             </Stack>
           ) : (
             <Stack direction="row" spacing={1} alignItems="center">
-              {/* ✅ Dashboard button ΔΙΠΛΑ απο το dropdown */}
               {headerAction && (
                 <Button
                   variant="contained"
@@ -183,7 +182,7 @@ export default function AppLayout() {
                   py: 1,
                 }}
               >
-                {/* ✅ δείχνει ΟΝΟΜΑΤΕΠΩΝΥΜΟ δίπλα, όχι μόνο ρόλο */}
+                
                 {user.fullName}
               </Button>
 
@@ -203,7 +202,7 @@ export default function AppLayout() {
 
                 <Divider />
 
-                {/* ✅ Dropdown items ΧΩΡΙΣ Dashboard */}
+                
                 {dropdownItems.map((it) => (
                   <MenuItem key={it.to} onClick={() => go(it.to)}>
                     {it.label}

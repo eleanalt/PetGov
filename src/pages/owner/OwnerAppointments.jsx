@@ -13,6 +13,11 @@ import {
   TableRow,
   TableCell,
   TableBody,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
 } from "@mui/material";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import { useNavigate } from "react-router-dom";
@@ -52,7 +57,7 @@ function fmtApptWhen(a) {
   return "—";
 }
 
-// ✅ Date object από appointment
+
 function getApptDateObj(a) {
   if (!a) return null;
 
@@ -84,6 +89,11 @@ export default function OwnerAppointments() {
   const [vetsById, setVetsById] = useState({});
   const [petsById, setPetsById] = useState({});
 
+ 
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [cancelTarget, setCancelTarget] = useState(null);
+  const [cancelling, setCancelling] = useState(false);
+
   const load = async () => {
     if (!user?.id) return;
     setLoading(true);
@@ -104,9 +114,7 @@ export default function OwnerAppointments() {
       setVetsById(Object.fromEntries(vets.map((v) => [String(v.id), v])));
       setPetsById(Object.fromEntries(pets.map((p) => [String(p.id), p])));
 
-      // ✅ AUTO STATUS UPDATE με βάση την ώρα:
-      // pending που πέρασε -> cancelled
-      // confirmed που πέρασε -> completed
+      
       const now = new Date();
       const nowIso = new Date().toISOString();
 
@@ -185,10 +193,20 @@ export default function OwnerAppointments() {
   const canCancel = (a) => a?.status === "pending" || a?.status === "confirmed";
   const canReview = (a) => a?.status === "completed";
 
-  const cancelAppointment = async (a) => {
+  const askCancelAppointment = (a) => {
+    if (!a?.id) return;
+    if (!canCancel(a)) return;
+    setCancelTarget(a);
+    setCancelDialogOpen(true);
+  };
+
+ 
+  const confirmCancelAppointment = async () => {
+    const a = cancelTarget;
     if (!a?.id) return;
     if (!canCancel(a)) return;
 
+    setCancelling(true);
     try {
       const now = new Date().toISOString();
       await api.patch(`/appointments/${a.id}`, {
@@ -197,10 +215,14 @@ export default function OwnerAppointments() {
         cancelledBy: "owner",
         updatedAt: now,
       });
+      setCancelDialogOpen(false);
+      setCancelTarget(null);
       await load();
     } catch (e) {
       console.error(e);
       alert("Αποτυχία ακύρωσης. Δοκίμασε ξανά.");
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -230,6 +252,46 @@ export default function OwnerAppointments() {
             Νέο Ραντεβού
           </Button>
         </Stack>
+
+    
+        <Dialog
+          open={cancelDialogOpen}
+          onClose={() => {
+            if (cancelling) return;
+            setCancelDialogOpen(false);
+            setCancelTarget(null);
+          }}
+        >
+          <DialogTitle>Ακύρωση ραντεβού</DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              Σίγουρα θέλετε να ακυρώσετε το ραντεβού
+              {cancelTarget ? ` (${fmtApptWhen(cancelTarget)})` : ""};
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={() => {
+                if (cancelling) return;
+                setCancelDialogOpen(false);
+                setCancelTarget(null);
+              }}
+              sx={{ textTransform: "none" }}
+              disabled={cancelling}
+            >
+              Όχι
+            </Button>
+            <Button
+              onClick={confirmCancelAppointment}
+              variant="contained"
+              color="error"
+              sx={{ textTransform: "none" }}
+              disabled={cancelling}
+            >
+              Ναι, ακύρωση
+            </Button>
+          </DialogActions>
+        </Dialog>
 
         {/* Ενεργά */}
         <Card variant="outlined" sx={{ borderRadius: 3, mb: 2 }}>
@@ -299,7 +361,7 @@ export default function OwnerAppointments() {
 
                               <Button
                                 disabled={!canCancel(a)}
-                                onClick={() => cancelAppointment(a)}
+                                onClick={() => askCancelAppointment(a)}
                                 sx={{ textTransform: "none", bgcolor: "grey.300", borderRadius: 2 }}
                               >
                                 Ακύρωση

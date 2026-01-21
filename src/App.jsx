@@ -45,10 +45,7 @@ import VetAppointments from "./pages/vet/VetAppointments";
 import VetReviews from "./pages/vet/VetReviews";
 import VetActDurations from "./pages/vet/VetActDurations";
 
-
-import OwnersFaq from "./pages/info/OwnersFaq";
-import VetsFaq from "./pages/info/VetsFaq";
-import CitizensFaq from "./pages/info/CitizensFaq";
+import FaqTabsPage from "./pages/info/FaqTabsPage";
 
 export default function App() {
   return (
@@ -62,9 +59,7 @@ export default function App() {
         <Route path="/lost" element={<LostPets />} />
         <Route path="/lost/:id" element={<LostPetDetails />} />
         <Route path="/lost/:id/found" element={<FoundReportWizard />} />
-        <Route path="/info/owners" element={<OwnersFaq />} />
-        <Route path="/info/vets" element={<VetsFaq />} />
-        <Route path="/info/citizens" element={<CitizensFaq />} />
+        <Route path="/info/faqs" element={<FaqTabsPage />} />
 
         {/* Owner protected */}
        {/* Owner protected */}

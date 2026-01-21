@@ -28,6 +28,8 @@ export default function OwnerBreadcrumbs() {
     crumbs.push({ label: "Καταγραφές", to: "/owner/registrations" });
   } else if (pathname.startsWith("/owner/lost-pets")) {
     crumbs.push({ label: "Lost Pets", to: "/owner/lost-pets" });
+     } else if (pathname.startsWith("/owner/healthbook")) {
+    crumbs.push({ label: "Βιβλιάριο Υγείας", to: "/owner/healthbook" });
   } else {
 
     crumbs.push({ label: "Dashboard", to: "/owner" });

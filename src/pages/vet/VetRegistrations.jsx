@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Box, Button, Card, CardContent, Container, Divider, Grid, Stack, Typography } from "@mui/material";
 import { api } from "../../api/client";
 import { useNavigate } from "react-router-dom";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import { useAuth } from "../../auth/AuthContext";
 
 export default function VetRegistrations() {
@@ -32,6 +33,14 @@ export default function VetRegistrations() {
   return (
     <Box sx={{ bgcolor: "grey.100", minHeight: "calc(100vh - 76px)", py: 4 }}>
       <Container maxWidth="lg">
+        
+          <Button
+            startIcon={<ArrowBackIcon />}
+            onClick={() => navigate(-1)}
+            sx={{ textTransform: "none", width: "fit-content" }}
+          >
+            Επιστροφή στην προηγούμενη σελίδα
+          </Button>
         <Card variant="outlined" sx={{ borderRadius: 2 }}>
           <CardContent sx={{ p: { xs: 2.5, md: 4 } }}>
             <Typography variant="h4" fontWeight={900} sx={{ mb: 1 }}>

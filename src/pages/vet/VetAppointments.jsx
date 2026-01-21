@@ -449,8 +449,8 @@ export default function VetAppointments() {
                                 textTransform: "none",
                                 borderRadius: 999,
                                 px: 3,
-                                bgcolor: "grey.700",
-                                "&:hover": { bgcolor: "grey.800" },
+                                bgcolor: "success.main",
+                                "&:hover": { bgcolor: "success.main" },
                               }}
                             >
                               Επιβεβαίωση

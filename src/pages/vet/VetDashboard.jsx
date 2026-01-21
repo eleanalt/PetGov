@@ -124,14 +124,7 @@ export default function VetDashboard() {
               </Grid>
 
               {/* Προαιρετικό: FAQ (αν υπάρχει route) */}
-              <Grid item xs={12}>
-                <ActionButton
-                  label="Συχνές Ερωτήσεις (FAQ)"
-                  icon={<HelpOutlineIcon />}
-                  onClick={() => navigate("/vet/faq")}
-                  variant="contained"
-                />
-              </Grid>
+              
             </Grid>
           </CardContent>
         </Card>

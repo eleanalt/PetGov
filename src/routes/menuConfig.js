@@ -3,13 +3,9 @@ export const MAIN_NAV = [
   { label: "Απολεσθέντα Ζώα", to: "/lost", roles: ["public", "citizen", "owner", "vet"] },
 ];
 
-/**
- * ✅ Αυτό εμφανίζεται ΠΑΝΩ δεξιά δίπλα στο ονοματεπώνυμο
- * (όχι μέσα στο dropdown).
- */
 export const HEADER_ACTIONS = {
   owner: { label: "Dashboard", to: "/owner" },
-  vet: { label: "Dashboard", to: "/vet" }, // αν δεν το θες για vet, κάντο comment ή σβήστο
+  vet: { label: "Dashboard", to: "/vet" },
 };
 
 export const USER_MENU = {
@@ -24,7 +20,7 @@ export const USER_MENU = {
     { label: "Προφίλ", to: "/vet/profile" },
     { label: "Καταγραφές", to: "/vet/registrations" },
     { label: "Ιατρικές Πράξεις", to: "/vet/acts" },
-    { label: "Ραντεβού", to: "/vet/appointments" },
+    { label: "Ραντεβού & Διαθεσιμότητα", to: "/vet/appointments" },
     { label: "Αξιολογήσεις", to: "/vet/reviews" },
   ],
 };
@@ -44,7 +40,6 @@ export function isAllowed(itemRoles, user) {
   return itemRoles.includes(effectiveRole(user));
 }
 
-/** ✅ ασφαλές helper */
 export function getUserMenu(user) {
   const role = effectiveRole(user);
   return USER_MENU[role] ?? [];

@@ -84,7 +84,6 @@ export default function VetAvailabilityEdit() {
       const res = await api.get("/vetAvailability", { params: { vetId: String(user.id) } });
       const arr = Array.isArray(res.data) ? res.data : [];
 
-      // ✅ Φιλτράρουμε ώστε όσα blocks έχουν ΠΕΡΑΣΕΙ (endAt < τώρα) να ΜΗΝ εμφανίζονται
       const futureOnly = arr.filter((b) => {
         const endAt =
           b.endAt ||
@@ -118,7 +117,6 @@ export default function VetAvailabilityEdit() {
     loadDurations();
   }, [user?.id]);
 
-  // ✅ Επιπλέον: κάθε 60" κάνε auto-refresh ώστε μόλις περάσει ώρα, να εξαφανίζεται
   useEffect(() => {
     const t = setInterval(() => {
       loadBlocks();
@@ -148,7 +146,6 @@ export default function VetAvailabilityEdit() {
       return;
     }
 
-    // ✅ μην αφήνεις παρελθοντική ημερομηνία
     if (date < today) {
       setMsg({ type: "error", text: "Δεν μπορείς να δηλώσεις block σε παρελθοντική ημερομηνία." });
       return;
@@ -159,7 +156,6 @@ export default function VetAvailabilityEdit() {
       return;
     }
 
-    // ✅ μην αφήνεις block στο παρελθόν (ίδια μέρα αλλά ώρα πριν από τώρα)
     const startAt = toIsoFromLocal(date, startTime);
     const endAt = toIsoFromLocal(date, endTime);
 
@@ -173,7 +169,6 @@ export default function VetAvailabilityEdit() {
       return;
     }
 
-    // ✅ ελάχιστη διάρκεια block
     if (minActMinutes > 0 && timeToMin(endTime) - timeToMin(startTime) < minActMinutes) {
       setMsg({
         type: "error",
@@ -182,7 +177,6 @@ export default function VetAvailabilityEdit() {
       return;
     }
 
-    // ✅ έλεγχος επικάλυψης με υπάρχοντα blocks (στην ίδια κτηνίατρο)
     const overlaps = (blocks || []).some((b) => {
       if (String(b.vetId) !== String(user.id)) return false;
       if (String(b.date) !== String(date)) return false;
@@ -209,7 +203,7 @@ export default function VetAvailabilityEdit() {
         date,
         startTime,
         endTime,
-        // ✅ αποθήκευση σωστά ως ISO timestamps (για μελλοντική χρήση/φιλτράρισμα)
+     
         startAt,
         endAt,
         status: "open",
@@ -244,7 +238,6 @@ export default function VetAvailabilityEdit() {
     }
   };
 
-  // ✅ προαιρετικό: σβήνει από DB όσα blocks έχουν λήξει (δεν θα ξαναφανούν ποτέ)
   const cleanupPastBlocks = async () => {
     if (!user?.id) return;
     setMsg({ type: "", text: "" });
@@ -335,7 +328,7 @@ export default function VetAvailabilityEdit() {
                     value={form.date}
                     onChange={setField("date")}
                     InputLabelProps={{ shrink: true }}
-                    inputProps={{ min: today }} // ✅ μόνο από σήμερα και μετά
+                    inputProps={{ min: today }} 
                     fullWidth
                   />
 

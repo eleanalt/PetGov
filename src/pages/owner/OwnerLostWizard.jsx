@@ -23,7 +23,12 @@ import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 
-const steps = ["Συμπλήρωση στοιχείων", "Στοιχεία απώλειας", "Προσωρινή αποθήκευση", "Οριστική υποβολή"];
+const steps = [
+  "Συμπλήρωση στοιχείων",
+  "Στοιχεία απώλειας",
+  "Προσωρινή αποθήκευση",
+  "Οριστική υποβολή",
+];
 
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
@@ -55,6 +60,8 @@ export default function OwnerLostWizard() {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState({ type: "", text: "" });
 
+  const [photoMeta, setPhotoMeta] = useState(null); // { name, size, type }
+
   const [pets, setPets] = useState([]);
 
   const [lockedAll, setLockedAll] = useState(false);
@@ -66,23 +73,74 @@ export default function OwnerLostWizard() {
     petName: "",
     species: "",
     sex: "",
-    photoBase64: "",
+    photoBase64: "", 
 
     lostArea: "",
     lostDate: "",
     details: "",
 
-    status: "draft", // draft | submitted | found | cancelled
+    status: "draft",
   });
 
-  const isStep1Valid = useMemo(() => form.petId && form.microchip, [form.petId, form.microchip]);
-  const isStep2Valid = useMemo(() => form.lostArea && form.lostDate, [form.lostArea, form.lostDate]);
+  const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
+
+  const [touched, setTouched] = useState({
+    petId: false,
+    lostArea: false,
+    lostDate: false,
+  });
+
+  const isStep1Valid = useMemo(
+    () => Boolean(form.petId && form.microchip),
+    [form.petId, form.microchip]
+  );
+  const isStep2Valid = useMemo(
+    () => Boolean(form.lostArea && form.lostDate && form.lostDate <= todayStr),
+    [form.lostArea, form.lostDate, todayStr]
+  );
 
   const finalized =
     form.status === "submitted" || form.status === "found" || form.status === "cancelled";
 
+  const errors = useMemo(() => {
+    const e = {};
+
+    if (touched.petId && !form.petId) e.petId = "Επίλεξε κατοικίδιο (microchip).";
+
+    if (touched.lostArea && !form.lostArea?.trim()) e.lostArea = "Συμπλήρωσε περιοχή απώλειας.";
+
+    if (touched.lostDate) {
+      if (!form.lostDate) e.lostDate = "Συμπλήρωσε ημερομηνία απώλειας.";
+      else if (form.lostDate > todayStr) e.lostDate = "Η ημερομηνία δεν μπορεί να είναι μελλοντική.";
+    }
+
+    return e;
+  }, [form.petId, form.lostArea, form.lostDate, touched, todayStr]);
+
+  const touch = (keys) =>
+    setTouched((t) => keys.reduce((acc, k) => ({ ...acc, [k]: true }), t));
+
+  const validateStep = (s) => {
+    if (s === 0) {
+      touch(["petId"]);
+      return Boolean(form.petId && form.microchip);
+    }
+    if (s === 1) {
+      touch(["lostArea", "lostDate"]);
+      return Boolean(form.lostArea && form.lostDate && form.lostDate <= todayStr);
+    }
+    return true;
+  };
+
   const goStep = (next) => {
     if (finalized) return;
+
+    // αν πάμε μπροστά, validate το τρέχον step
+    if (next > step) {
+      const ok = validateStep(step);
+      if (!ok) return;
+    }
+
     setStep(next);
   };
 
@@ -108,13 +166,17 @@ export default function OwnerLostWizard() {
         }
 
         const st = d.status || "draft";
+
+        const existingPhoto =
+          d.photoBase64 ?? (Array.isArray(d.photos) ? d.photos[0] : "") ?? "";
+
         setForm({
           petId: d.petId ?? "",
           microchip: d.microchip ?? "",
           petName: d.petName ?? "",
           species: d.species ?? "",
           sex: d.sex ?? "",
-          photoBase64: d.photoBase64 ?? (Array.isArray(d.photos) ? d.photos[0] : ""),
+          photoBase64: existingPhoto,
 
           lostArea: d.lostArea ?? d.area ?? "",
           lostDate: d.lostDate ?? "",
@@ -122,6 +184,12 @@ export default function OwnerLostWizard() {
 
           status: st,
         });
+
+        // reset validation state
+        setTouched({ petId: false, lostArea: false, lostDate: false });
+
+        // αν υπάρχει ήδη φωτο, δεν ξέρουμε name/size → αφήνουμε meta null
+        setPhotoMeta(null);
 
         if (st === "found" || st === "cancelled") {
           setLockedAll(true);
@@ -154,6 +222,7 @@ export default function OwnerLostWizard() {
     const petId = e.target.value;
     const p = pets.find((x) => String(x.id) === String(petId));
     if (!p) return;
+
     setForm((f) => ({
       ...f,
       petId: String(p.id),
@@ -166,13 +235,29 @@ export default function OwnerLostWizard() {
 
   const onPickPhoto = async (e) => {
     const file = e.target.files?.[0];
+    if (!file) return;
+
+    
+    const MAX = 2 * 1024 * 1024;
+    if (file.size > MAX) {
+      setMsg({ type: "error", text: "Η φωτογραφία είναι πολύ μεγάλη (max 2MB)." });
+      e.target.value = "";
+      return;
+    }
+
     const b64 = await fileToBase64(file);
+
+    setPhotoMeta({ name: file.name, size: file.size, type: file.type });
     setForm((f) => ({ ...f, photoBase64: b64 }));
+
+    e.target.value = "";
   };
 
   const saveDraft = async () => {
     setMsg({ type: "", text: "" });
     if (!user?.id) return;
+
+    touch(["petId", "lostArea", "lostDate"]);
 
     if (!isStep1Valid || !isStep2Valid) {
       setMsg({ type: "error", text: "Συμπλήρωσε τα υποχρεωτικά πεδία." });
@@ -182,11 +267,22 @@ export default function OwnerLostWizard() {
     setSaving(true);
     try {
       const payload = {
-        ...form,
-        ownerId: String(user.id),
+        petId: form.petId,
+        microchip: form.microchip,
+        petName: form.petName,
+        species: form.species,
+        sex: form.sex,
+
+        lostArea: form.lostArea,
+        lostDate: form.lostDate,
+        details: form.details,
+
         status: "draft",
+        ownerId: String(user.id),
+
         photos: form.photoBase64 ? [form.photoBase64] : [],
-        area: form.lostArea, // για συμβατότητα αν το LostPets διαβάζει area
+        area: form.lostArea,
+
         updatedAt: new Date().toISOString(),
         createdAt: new Date().toISOString(),
       };
@@ -214,6 +310,8 @@ export default function OwnerLostWizard() {
     setMsg({ type: "", text: "" });
     if (!user?.id) return;
 
+    touch(["petId", "lostArea", "lostDate"]);
+
     if (!isStep1Valid || !isStep2Valid) {
       setMsg({ type: "error", text: "Συμπλήρωσε τα υποχρεωτικά πεδία." });
       return;
@@ -222,11 +320,22 @@ export default function OwnerLostWizard() {
     setSaving(true);
     try {
       const payload = {
-        ...form,
+        petId: form.petId,
+        microchip: form.microchip,
+        petName: form.petName,
+        species: form.species,
+        sex: form.sex,
+
+        lostArea: form.lostArea,
+        lostDate: form.lostDate,
+        details: form.details,
+
         ownerId: String(user.id),
         status: "submitted",
+
         photos: form.photoBase64 ? [form.photoBase64] : [],
         area: form.lostArea,
+
         updatedAt: new Date().toISOString(),
       };
 
@@ -236,7 +345,7 @@ export default function OwnerLostWizard() {
         await api.post(`/lostPets`, { ...payload, createdAt: new Date().toISOString() });
       }
 
-      setSubmittedLocked(true); // κλειδώνει πεδία (όχι το status)
+      setSubmittedLocked(true);
       setLockedAll(false);
       setStep(3);
       setMsg({ type: "success", text: "Η δήλωση υποβλήθηκε οριστικά." });
@@ -301,7 +410,6 @@ export default function OwnerLostWizard() {
               Δήλωση Απώλειας
             </Typography>
 
-            {/* ✅ Stepper κλειδωμένο όταν finalized (disabled click) */}
             <Stepper activeStep={step} alternativeLabel sx={{ mb: 3 }}>
               {steps.map((label) => (
                 <Step key={label}>
@@ -325,6 +433,9 @@ export default function OwnerLostWizard() {
                     label="* Αριθμός microchip"
                     value={form.petId}
                     onChange={onSelectPet}
+                    onBlur={() => setTouched((t) => ({ ...t, petId: true }))}
+                    error={Boolean(errors.petId)}
+                    helperText={errors.petId || " "}
                     disabled={fieldsDisabled || finalized}
                     fullWidth
                   >
@@ -355,11 +466,55 @@ export default function OwnerLostWizard() {
                     <input hidden type="file" accept="image/*" onChange={onPickPhoto} />
                   </Button>
 
+                  {form.photoBase64 ? (
+                    <Card variant="outlined" sx={{ borderRadius: 2 }}>
+                      <CardContent>
+                        <Typography fontWeight={800} sx={{ mb: 1 }}>
+                          Προεπισκόπηση φωτογραφίας
+                        </Typography>
+
+                        <Box
+                          component="img"
+                          src={form.photoBase64}
+                          alt="preview"
+                          sx={{
+                            width: "100%",
+                            height: 220,
+                            objectFit: "cover",
+                            borderRadius: 2,
+                            border: "1px solid",
+                            borderColor: "divider",
+                            display: "block",
+                            mb: 1,
+                          }}
+                        />
+
+                        <Typography variant="body2" color="text.secondary">
+                          {photoMeta?.name
+                            ? `${photoMeta.name} • ${Math.round(photoMeta.size / 1024)} KB`
+                            : "Επιλέχθηκε φωτογραφία"}
+                        </Typography>
+
+                        <Button
+                          variant="text"
+                          color="error"
+                          onClick={() => {
+                            setForm((f) => ({ ...f, photoBase64: "" }));
+                            setPhotoMeta(null);
+                          }}
+                          sx={{ textTransform: "none", px: 0, mt: 1 }}
+                        >
+                          Αφαίρεση φωτογραφίας
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ) : null}
+
                   <Button
                     variant="contained"
                     color="success"
                     onClick={() => goStep(1)}
-                    disabled={!isStep1Valid || finalized}
+                    disabled={finalized}
                     sx={{ textTransform: "none", borderRadius: 2, fontWeight: 900 }}
                   >
                     Συνέχεια
@@ -376,6 +531,9 @@ export default function OwnerLostWizard() {
                     label="* Περιοχή Απώλειας"
                     value={form.lostArea}
                     onChange={setField("lostArea")}
+                    onBlur={() => setTouched((t) => ({ ...t, lostArea: true }))}
+                    error={Boolean(errors.lostArea)}
+                    helperText={errors.lostArea || " "}
                     disabled={fieldsDisabled || finalized}
                     fullWidth
                   />
@@ -385,8 +543,12 @@ export default function OwnerLostWizard() {
                     type="date"
                     value={form.lostDate}
                     onChange={setField("lostDate")}
+                    onBlur={() => setTouched((t) => ({ ...t, lostDate: true }))}
+                    error={Boolean(errors.lostDate)}
+                    helperText={errors.lostDate || " "}
                     disabled={fieldsDisabled || finalized}
                     InputLabelProps={{ shrink: true }}
+                    inputProps={{ max: todayStr }}
                     fullWidth
                   />
 
@@ -414,7 +576,7 @@ export default function OwnerLostWizard() {
                       variant="contained"
                       onClick={() => goStep(2)}
                       color="success"
-                      disabled={!isStep2Valid || finalized}
+                      disabled={finalized}
                       sx={{ textTransform: "none", borderRadius: 2, fontWeight: 900 }}
                     >
                       Συνέχεια
@@ -424,7 +586,7 @@ export default function OwnerLostWizard() {
               </Box>
             )}
 
-            {/* STEP 3: Preview + Draft */}
+            {/* STEP 3 */}
             {step === 2 && (
               <Box sx={{ maxWidth: 560, mx: "auto" }}>
                 <Typography fontWeight={900} sx={{ mb: 1 }}>
@@ -496,7 +658,6 @@ export default function OwnerLostWizard() {
                 <Preview label="Ημερομηνία Απώλειας" value={form.lostDate || "—"} />
                 <Preview label="Τοποθεσία" value={form.lostArea || "—"} />
 
-                {/* ✅ STATUS DROPDOWN */}
                 <Box sx={{ mt: 2 }}>
                   <FormControl fullWidth>
                     <InputLabel id="status-label">Κατάσταση</InputLabel>
@@ -505,7 +666,12 @@ export default function OwnerLostWizard() {
                       label="Κατάσταση"
                       value={form.status}
                       onChange={(e) => changeStatus(e.target.value)}
-                      disabled={saving || form.status === "found" || form.status === "cancelled" || !lostId}
+                      disabled={
+                        saving ||
+                        form.status === "found" ||
+                        form.status === "cancelled" ||
+                        !lostId
+                      }
                     >
                       {STATUS_OPTIONS.map((o) => (
                         <MenuItem key={o.value} value={o.value}>
@@ -516,14 +682,17 @@ export default function OwnerLostWizard() {
                   </FormControl>
 
                   {(form.status === "found" || form.status === "cancelled") && (
-                    <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: "block" }}>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ mt: 1, display: "block" }}
+                    >
                       Η κατάσταση είναι κλειδωμένη και δεν μπορεί να αλλάξει.
                     </Typography>
                   )}
                 </Box>
 
                 <Stack direction="row" justifyContent="space-between" sx={{ mt: 3 }}>
-                  {/* Αν finalized (submitted/found/cancelled) δεν δείχνουμε "Προηγούμενο" */}
                   {!finalized ? (
                     <Button
                       variant="outlined"
@@ -537,8 +706,9 @@ export default function OwnerLostWizard() {
                     <Box />
                   )}
 
-                  {/* Αν δεν έχει υποβληθεί -> δείξε submit, αλλιώς επιστροφή */}
-                  {form.status !== "submitted" && form.status !== "found" && form.status !== "cancelled" ? (
+                  {form.status !== "submitted" &&
+                  form.status !== "found" &&
+                  form.status !== "cancelled" ? (
                     <Button
                       variant="contained"
                       onClick={submitFinal}
@@ -552,7 +722,12 @@ export default function OwnerLostWizard() {
                     <Button
                       variant="contained"
                       onClick={() => navigate("/owner/lost")}
-                      sx={{ textTransform: "none", borderRadius: 2, fontWeight: 900, bgcolor: "grey.700" }}
+                      sx={{
+                        textTransform: "none",
+                        borderRadius: 2,
+                        fontWeight: 900,
+                        bgcolor: "grey.700",
+                      }}
                     >
                       Επιστροφή
                     </Button>

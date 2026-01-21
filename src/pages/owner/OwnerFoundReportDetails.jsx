@@ -73,7 +73,6 @@ function SectionCard({ title, rows }) {
   );
 }
 
-// ✅ για mismatch 544 vs 0544 κλπ
 function normId(x) {
   const s = String(x ?? "");
   const trimmed = s.replace(/^0+/, "");
@@ -113,10 +112,6 @@ export default function OwnerFoundReportDetails() {
           return;
         }
 
-        // (προαιρετικό) access check: αν έχεις reporterId στη βάση, χρησιμοποίησέ το
-        // Στο JSON σου δεν υπάρχει reporterId, οπότε το αφήνουμε εκτός.
-
-        // ✅ φέρνουμε όλα τα lostPets για να βρούμε σωστά το id (λόγω leading zeros)
         const lRes = await api.get("/lostPets");
         const lostPets = Array.isArray(lRes.data) ? lRes.data : [];
 
@@ -156,7 +151,6 @@ export default function OwnerFoundReportDetails() {
       { label: "Είδος", value: lostPet?.species || "—" },
       { label: "Microchip", value: lostPet?.microchip || report.microchip || "—" },
       { label: "Φύλο", value: lostPet?.sex || "—" },
-      // Στη βάση σου δεν υπάρχει birthDate, οπότε το αφήνουμε κενό
       { label: "Ημερομηνία γέννησης", value: lostPet?.birthDate ? fmtDate(lostPet.birthDate) : "—" },
     ];
   }, [report, lostPet]);

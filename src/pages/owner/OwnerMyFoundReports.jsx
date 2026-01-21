@@ -46,7 +46,7 @@ function fmtDate(isoOrDate) {
   return `${dd}/${mm}/${yyyy}`;
 }
 
-// ✅ 0544 -> 544 (και 000 -> 0)
+
 function normId(x) {
   const s = String(x ?? "");
   const trimmed = s.replace(/^0+/, "");
@@ -86,21 +86,18 @@ export default function OwnerMyFoundReports() {
     })();
   }, [user?.id]);
 
-  // ✅ Map για exact match
   const lostPetById = useMemo(() => {
     const m = new Map();
     lostPets.forEach((p) => m.set(String(p.id), p));
     return m;
   }, [lostPets]);
 
-  // ✅ Map για match χωρίς leading zeros (π.χ. "0544" -> "544")
   const lostPetByNormId = useMemo(() => {
     const m = new Map();
     lostPets.forEach((p) => m.set(normId(p.id), p));
     return m;
   }, [lostPets]);
 
-  // ✅ fallback: microchip -> lostPet
   const lostPetByMicrochip = useMemo(() => {
     const m = new Map();
     lostPets.forEach((p) => {

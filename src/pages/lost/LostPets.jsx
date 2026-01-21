@@ -76,9 +76,7 @@ function LostPetCard({ lost, pet, onOpen }) {
           <Chip size="small" label={pet?.species ?? "—"} />
         </Stack>
 
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-          {pet?.color ?? "—"} • {pet?.sex ?? "—"}
-        </Typography>
+        
 
         <Stack spacing={1} sx={{ mt: 2 }}>
           <Stack direction="row" spacing={1} alignItems="center">

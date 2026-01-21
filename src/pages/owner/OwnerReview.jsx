@@ -146,7 +146,7 @@ export default function OwnerReview() {
                     variant="contained"
                     onClick={submit}
                     disabled={!canSubmit}
-                    sx={{ textTransform: "none", borderRadius: 999, bgcolor: "grey.700", px: 4 }}
+                    sx={{ textTransform: "none", borderRadius: 999, bgcolor: "success.main", px: 4 }}
                   >
                     Υποβολή Αξιολόγησης
                   </Button>

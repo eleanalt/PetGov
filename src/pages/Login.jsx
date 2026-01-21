@@ -11,31 +11,47 @@ export default function Login() {
   const navigate = useNavigate();
   const { login } = useAuth();
 
-  const [email, setEmail] = useState("maria@demo.gr");
-  const [password, setPassword] = useState("1234");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   const onSubmit = async (e) => {
     e.preventDefault();
     setError("");
+
+    const emailTrim = email.trim();
+    const passTrim = password.trim();
+
+    
+    if (!emailTrim) {
+      setError("Συμπλήρωσε email.");
+      return;
+    }
+    if (!passTrim) {
+      setError("Συμπλήρωσε κωδικό.");
+      return;
+    }
+
     setLoading(true);
 
     try {
+      
       const res = await axios.get(`${API_BASE}/users`, {
-        params: { email: email.trim(), password: password.trim() },
+        params: { email: emailTrim },
       });
 
       const user = Array.isArray(res.data) ? res.data[0] : null;
-      if (!user) {
+
+      
+      if (!user || String(user.password ?? "").trim() !== passTrim) {
         setError("Λάθος email ή κωδικός.");
         return;
       }
 
-      // κρατάμε το login στο context (και συνήθως γράφει και localStorage)
       if (typeof login === "function") login(user);
 
-      // ✅ ΠΑΝΤΑ στην κανονική αρχική
+      
       navigate("/", { replace: true });
     } catch {
       setError("Δεν είναι διαθέσιμος ο server (JSON Server στο 3001).");
@@ -56,6 +72,7 @@ export default function Login() {
         <TextField
           label="Email"
           fullWidth
+          required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           sx={{ mb: 2 }}
@@ -64,6 +81,7 @@ export default function Login() {
           label="Κωδικός Πρόσβασης"
           type="password"
           fullWidth
+          required
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           sx={{ mb: 2 }}
@@ -79,7 +97,11 @@ export default function Login() {
           {loading ? "..." : "Σύνδεση"}
         </Button>
 
-        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 2 }}>
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ display: "block", mt: 2 }}
+        >
           Demo logins: maria@demo.gr / 1234 (owner), vet@demo.gr / 1234 (vet)
         </Typography>
       </Box>

@@ -14,7 +14,6 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../../api/client";
 
-// ✅ 0544 -> 544
 function normId(x) {
   const s = String(x ?? "");
   const t = s.replace(/^0+/, "");
@@ -27,7 +26,7 @@ function unique(arr) {
 
 export default function OwnerFoundView() {
   const navigate = useNavigate();
-  const { id } = useParams(); // /owner/found/:id
+  const { id } = useParams(); 
   const [params] = useSearchParams();
   const lostIdFromQuery = params.get("lostId") || "";
 
@@ -51,14 +50,11 @@ export default function OwnerFoundView() {
       try {
         let fr = null;
 
-        // A) /owner/found/:id
         if (id) {
           const r = await api.get(`/foundReports/${id}`);
           fr = r?.data || null;
         }
-        // B) /owner/found/view?lostId=...
         else if (lostIdFromQuery) {
-          // ✅ Φέρε ΟΛΕΣ και φίλτραρε χειροκίνητα με normId για να πιάσει 544 vs 0544
           const r = await api.get("/foundReports");
           const arr = Array.isArray(r.data) ? r.data : [];
 
@@ -95,7 +91,6 @@ export default function OwnerFoundView() {
         if (cancelled) return;
         setReport(fr);
 
-        // ✅ φόρτωσε lostPet με fallback ids (544 / 0544 / padStart)
         const rawLostId = fr.lostPetId || lostIdFromQuery;
 
         if (!rawLostId) {

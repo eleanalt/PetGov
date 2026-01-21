@@ -4,7 +4,6 @@ import { clearStoredUser, getStoredUser, setStoredUser } from "./authStorage";
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  // ✅ στο refresh ξεκινάει από localStorage
   const [user, setUser] = useState(() => getStoredUser());
 
   const login = (u) => {
