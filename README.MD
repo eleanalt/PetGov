@@ -1,7 +1,3 @@
-Ελεάνα Λύτη 1115202100089
-Ζωή - Ηνώ Τσακίρογλου 1115202100187
-Σοφία Αθανασοπούλου 1115202100283
-
 Demo Login Information:
 Vet email: vet@demo.gr, Password: 1234
 Owner email: maria@demo.gr, Password: 1234
